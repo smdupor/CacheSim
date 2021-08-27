@@ -11,19 +11,28 @@
 #define CACHESIM_INCLUDE_CACHE_H
 
 #include <chrono>
+#include <vector>
 
-typedef struct Blocks {
+typedef struct Block {
+   explicit Block() {
+     tag = 0;
+     valid = false;
+     recency = 0;
+     dirty = false;
+   };
    uint_fast32_t tag;
    bool valid;
    uint8_t recency;
    bool dirty;
 } cache_blocks;
 
-typedef struct Sets{
-   explicit Sets(uint8_t size) {
-      blocks = new cache_blocks [size];
-   }
-   cache_blocks *blocks;
+typedef struct Set{
+   explicit Set(uint8_t size) {
+      for(size_t i =0; i< size; ++i){
+         blocks.emplace_back(cache_blocks());
+      }
+   };
+   std::vector<cache_blocks> blocks;
 } set;
 
 typedef struct cache_params{
@@ -38,19 +47,29 @@ typedef struct cache_params{
 class Cache {
 
 private:
-   // Timing variables
+   //Constants
+   const uint8_t address_length = 32;
+   // System-Level Vars
    std::chrono::time_point<std::chrono::steady_clock> sim_start;
    bool main_memory;
-   uint_fast32_t reads, read_misses, writes, write_misses, vc_swaps;
+   uint_fast32_t reads, read_hits, read_misses, writes, write_hits, write_misses, vc_swaps;
+   uint8_t tag_length, index_length, block_length, block_size, local_assoc, level;
+   uint_fast32_t num_sets, local_size;
    Cache *next_level;
    cache_params params;
-   Sets sets[];
+   std::vector<Set> sets;
+
+   // Current Access indices
+   uint_fast32_t current_index, current_tag;
+   inline void initialize_cache_memory();
+
 
 public:
-   Cache(cache_params *params, bool main_mem);
+   Cache(cache_params params, uint8_t level);
    ~Cache();
    void read(unsigned long &addr);
-   void write(unsigned long &addr, unsigned long &data);
+   void write(unsigned long &addr);
+   void report();
 };
 
 #endif //CACHESIM_INCLUDE_CACHE_H

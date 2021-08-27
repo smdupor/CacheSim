@@ -2,6 +2,13 @@
 #include <cstdlib>
 #include "Cache.h"
 
+
+/* Argument Reminders:
+ *
+ * sim_cache   <BLOCKSIZE>   <L1_SIZE>  <L1_ASSOC>  <VC_NUM_BLOCKS>   <L2_SIZE>  <L2_ASSOC>   <trace_file>
+ *
+ */
+
 int main (int argc, char* argv[])
 {
     FILE *FP;               // filepointer
@@ -16,17 +23,17 @@ int main (int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    params.block_size       = strtoul(argv[1], NULL, 10);
-    params.l1_size          = strtoul(argv[2], NULL, 10);
-    params.l1_assoc         = strtoul(argv[3], NULL, 10);
-    params.vc_num_blocks    = strtoul(argv[4], NULL, 10);
-    params.l2_size          = strtoul(argv[5], NULL, 10);
-    params.l2_assoc         = strtoul(argv[6], NULL, 10);
+    params.block_size       = strtoul(argv[1], nullptr, 10);
+    params.l1_size          = strtoul(argv[2], nullptr, 10);
+    params.l1_assoc         = strtoul(argv[3], nullptr, 10);
+    params.vc_num_blocks    = strtoul(argv[4], nullptr, 10);
+    params.l2_size          = strtoul(argv[5], nullptr, 10);
+    params.l2_assoc         = strtoul(argv[6], nullptr, 10);
     trace_file              = argv[7];
 
     // Open trace_file in read mode
     FP = fopen(trace_file, "r");
-    if(FP == NULL)
+    if(FP == nullptr)
     {
         // Throw error and exit if fopen() failed
         printf("Error: Unable to open file %s\n", trace_file);
@@ -46,17 +53,27 @@ int main (int argc, char* argv[])
             params.vc_num_blocks, params.l2_size, params.l2_assoc, trace_file);
 
     char str[2];
+
+    Cache L1 = Cache(params, 1);
+
     while(fscanf(FP, "%s %lx", str, &addr) != EOF)
     {
         
         rw = str[0];
-        if (rw == 'r')
+       /* if (rw == 'r')
             printf("%s %lx\n", "read", addr);           // Print and test if file is read correctly
         else if (rw == 'w')
             printf("%s %lx\n", "write", addr);          // Print and test if file is read correctly
-        /*************************************
-                  Add cache code here
-        **************************************/
+            */
+        if (rw == 'r')
+           L1.read(addr);
+
+           else if(rw == 'w')
+           L1.write(addr);
+
     }
+
+    L1.report();
+
     return EXIT_SUCCESS;
 }

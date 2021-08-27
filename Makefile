@@ -23,7 +23,8 @@ $(OBJ_DIR_LIB)/%.o:	$(SRC_DIR_LIB)/%.cpp $(HEAD_FILES)
 	$(CXX) -o $@ -c $< $(CXXFLAGS)
 	
 $(BIN_DIR)/%:	$(OBJ_DIR_EXE)/%.o
-	$(CXX) -o $@ -s $(subst $(BIN_DIR)/,$(OBJ_DIR_EXE)/,$@).o $(OBJ_FILES_LIB) $(HEAD_FILES) $(LDFLAGS) $(CXXFLAGS)
+	#$(CXX) -o $@ -s $(subst $(BIN_DIR)/,$(OBJ_DIR_EXE)/,$@).o $(OBJ_FILES_LIB) $(HEAD_FILES) $(LDFLAGS) $(CXXFLAGS)
+	$(CXX) -o $@ $(subst $(BIN_DIR)/,$(OBJ_DIR_EXE)/,$@).o $(OBJ_FILES_LIB) $(HEAD_FILES) $(LDFLAGS) $(CXXFLAGS)
 
 all:	PRE_REQ $(EXEC_FILES) $(OBJ_FILES_LIB)
 	@echo "Cleaning and Symlinking."
