@@ -1,4 +1,4 @@
-CXXFLAGS = -I include/ -O2 -g -Wall -fmessage-length=0 -std=c++11 -pthread
+CXXFLAGS = -I include/ -g -Wall -fmessage-length=0 -std=c++11
 
 SRC_DIR_LIB=src
 SRC_DIR_EXE=main

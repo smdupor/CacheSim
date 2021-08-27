@@ -10,10 +10,14 @@
 #include "Cache.h"
 
 Cache::Cache(cache_params *params, bool main_mem) {
+   this->params = *params;
+   reads=0, read_misses=0, writes=0, write_misses=0, vc_swaps=0;
+   //Cache *next_level;
    if(main_mem){
       this->main_memory = true;
       return;
    }
+
 
 }
 

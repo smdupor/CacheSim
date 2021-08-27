@@ -15,9 +15,16 @@
 typedef struct Blocks {
    uint_fast32_t tag;
    bool valid;
-   bool is_main_memory;
    uint8_t recency;
+   bool dirty;
 } cache_blocks;
+
+typedef struct Sets{
+   explicit Sets(uint8_t size) {
+      blocks = new cache_blocks [size];
+   }
+   cache_blocks *blocks;
+} set;
 
 typedef struct cache_params{
    unsigned long int block_size;
@@ -34,7 +41,10 @@ private:
    // Timing variables
    std::chrono::time_point<std::chrono::steady_clock> sim_start;
    bool main_memory;
-   cache_blocks blocks[];
+   uint_fast32_t reads, read_misses, writes, write_misses, vc_swaps;
+   Cache *next_level;
+   cache_params params;
+   Sets sets[];
 
 public:
    Cache(cache_params *params, bool main_mem);
