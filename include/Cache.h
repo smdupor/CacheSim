@@ -24,6 +24,9 @@ typedef struct Block {
    bool valid;
    uint8_t recency;
    bool dirty;
+   bool operator < (const Block i) const {
+      return (recency < i.recency);
+   }
 } cache_blocks;
 
 typedef struct Set{
@@ -62,14 +65,15 @@ private:
    // Current Access indices
    uint_fast32_t current_index, current_tag;
    inline void initialize_cache_memory();
-
+   void cache_line_report(uint8_t set_num);
 
 public:
    Cache(cache_params params, uint8_t level);
    ~Cache();
    void read(unsigned long &addr);
    void write(unsigned long &addr);
-   void report();
+   void contents_report();
+   void statistics_report();
 };
 
 #endif //CACHESIM_INCLUDE_CACHE_H

@@ -73,7 +73,8 @@ int main (int argc, char* argv[])
 
     }
 
-    L1.report();
+    L1.contents_report();
+   L1.statistics_report();
 
     return EXIT_SUCCESS;
 }

@@ -11,6 +11,7 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+#include <sstream>
 
 Cache::Cache(cache_params params, uint8_t level) {
    this->params = params;
@@ -83,6 +84,7 @@ void Cache::read(unsigned long &addr){
          if(!bl.valid || bl.recency > temp_recency)
             chosen_block = counter;
          ++bl.recency;
+         ++counter;
       }
 
       // Evict old data, and admit new data
@@ -110,6 +112,46 @@ void Cache::write(unsigned long &addr) {
 
 }
 
-void Cache::report() {
+void Cache::contents_report() {
+   if(this->main_memory)
+      return;
+   std::cout << "===== L" << std::to_string(this->level) <<" contents =====\n";
+   for(size_t i = 0; i<sets.size(); ++i)
+      cache_line_report(i);
+   std::cout << "\n";
+   this ->next_level->contents_report();
+}
+
+void Cache::cache_line_report(uint8_t set_num) {
+   //  set   0:   20028d D  20018a
+   std::string output = "  set  ";
+   if (set_num <= 9)
+      output += " ";
+   output += std::to_string(set_num);
+   output += ": ";
+
+   // Copy the set and sort it
+   std::vector<Block> temp_set = sets[set_num].blocks;
+   std::sort(temp_set.begin(), temp_set.end());
+
+   // Traverse the set and Convert the contents to a string
+   for(Block &b : temp_set){
+      output += "  ";
+      std::stringstream ss;
+      ss << std::hex << b.tag;
+      output += ss.str();
+      output += " ";
+      if (b.dirty)
+         output += "D";
+      else
+         output += " ";
+   }
+   output += "\n";
+
+   // Print contents to console
+   std::cout << output;
+}
+
+void Cache::statistics_report() {
    std::cout << "There were " << read_misses << " read misses and " << read_hits << " read hits.";
 }
