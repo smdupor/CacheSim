@@ -15,7 +15,8 @@
 Cache::Cache(cache_params params, uint8_t level) {
    this->params = params;
    this->level = level;
-   reads=0, read_misses=0, writes=0, write_misses=0, vc_swaps=0;
+   this->main_memory = false;
+   reads=0, read_misses=0, read_hits=0, writes=0, write_misses=0, write_hits=0, vc_swaps=0;
 
    switch(level) {
       case 0xff: // This is a main  memory
@@ -25,6 +26,7 @@ Cache::Cache(cache_params params, uint8_t level) {
          local_size =  params.l1_size;
          local_assoc = params.l1_assoc;
          initialize_cache_memory();
+         ++level;
          if(params.l2_size == 0)
             level = 0xff; // There is no L2 cache so the next level is Main Memory
          next_level = new Cache(params, level);
@@ -60,11 +62,7 @@ void Cache::read(unsigned long &addr){
    uint_fast32_t tag = addr >> (index_length + block_length);
    uint_fast32_t index = addr - (tag << (index_length + block_length));
    index  = index >> block_length;
-  /* for(Block &b : sets[index].blocks) {
-      if(b.valid && b.tag == tag) { //HIT
-         b.recency = 0;
-      }
-   }*/
+
    auto b = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
       return b.valid && b.tag == tag;
    });
@@ -79,10 +77,10 @@ void Cache::read(unsigned long &addr){
       uint8_t chosen_block = 0, counter = 0;
 
       // Traverse the set, looking for oldest block and updating age of blocks
-      for(Block &b : sets[index].blocks){
-         if(!b.valid || b.recency > temp_recency)
+      for(Block &bl : sets[index].blocks){
+         if(!bl.valid || bl.recency > temp_recency)
             chosen_block = counter;
-         ++b.recency;
+         ++bl.recency;
       }
 
       // Evict old data, and admit new data
@@ -93,13 +91,15 @@ void Cache::read(unsigned long &addr){
    }
    else {
       ++read_hits;
+      //Traverse the set and update recency of access
+      for(Block &bl : sets[index].blocks){
+         if(bl.recency != 0 && bl.recency != 0xff)
+            ++bl.recency;
+      }
+
       b->recency = 0;
 
-      //Traverse the set and update recency of access
-      for(Block &b : sets[index].blocks){
-         if(b.recency != 0 && b.recency != 0xff)
-            ++b.recency;
-      }
+
    }
    ++reads;
 }

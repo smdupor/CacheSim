@@ -54,7 +54,7 @@ int main (int argc, char* argv[])
 
     char str[2];
 
-    Cache L1 = Cache(params, 1);
+    Cache L1 = Cache(params, 0x01);
 
     while(fscanf(FP, "%s %lx", str, &addr) != EOF)
     {
