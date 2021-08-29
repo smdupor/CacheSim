@@ -56,8 +56,10 @@ inline void Cache::initialize_cache_memory() {
 Cache::~Cache() = default;
 
 void Cache::read(unsigned long &addr){
-   if(this->main_memory) // If this instance is main memory, assume FOUND and return
-      return;             // TODO Implement statistics later
+   if(this->main_memory) {
+      ++read_hits;
+      return;
+   }
 
    uint_fast32_t tag = addr >> (index_length + block_length);
    uint_fast32_t index = addr - (tag << (index_length + block_length));
