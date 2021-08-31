@@ -17,7 +17,7 @@ Cache::Cache(cache_params params, uint8_t level) {
    this->params = params;
    this->level = level;
    this->main_memory = false;
-   reads=0, read_misses=0, read_hits=0, writes=0, write_misses=0, write_hits=0, vc_swaps=0, write_backs=0;
+   reads=0, read_misses=0, read_hits=0, writes=0, write_misses=0, write_hits=0, vc_swaps=0, write_backs=0, vc_swap_requests=0;
 
    switch(level) {
       case 0xff: // This is a main  memory
@@ -58,7 +58,7 @@ Cache::~Cache() = default;
 
 void Cache::read(unsigned long &addr){
    if(this->main_memory) {
-      ++read_hits;
+      ++this->reads;
       return;
    }
 
@@ -181,5 +181,102 @@ void Cache::cache_line_report(uint8_t set_num) {
 }
 
 void Cache::statistics_report() {
-   std::cout << "There were " << read_misses << " read misses and " << read_hits << " read hits.";
+
+   if(this->level == 1) {
+      L1_stats_report();
+      next_level->statistics_report();
+      return;
+   }
+   L2_stats_report();
+   /*switch (level) {
+      case 0x01:
+         L1_stats_report();
+         next_level->statistics_report();
+         break;
+      default:
+         L2_stats_report();
+         break;
+   }
+   */
+}
+
+void Cache::L1_stats_report() {
+   std::string output = "===== Simulation results =====\n";
+   output += "a. number of L1 reads:                ";
+   cat_padded(&output, this->reads);
+   output+= "b. number of L1 read misses:          ";
+   cat_padded(&output, this->read_misses);
+   output+= "c. number of L1 writes:               ";
+   cat_padded(&output, this->writes);
+   output+= "d. number of L1 write misses:         ";
+   cat_padded(&output, this->write_misses);
+   output+= "e. number of swap requests:           ";
+   cat_padded(&output, this->vc_swap_requests);
+   output+= "f. swap request rate:                 ";
+   cat_padded(&output, 0.0); // TODO swap request rate
+   output+= "g. number of swaps:                   ";
+   cat_padded(&output, this->vc_swaps);
+   output+= "h. combined L1+VC miss rate:          ";
+   cat_padded(&output, 0.0); // TODO l1+vc miss rate
+   output+= "i. number writebacks from L1/VC:      ";
+   cat_padded(&output, this->write_backs);
+
+   std::cout << output;
+}
+
+void Cache::L2_stats_report() {
+   std::string output = "";
+
+   if(level == 2) {
+      output += "j. number of L2 reads:                ";
+      cat_padded(&output, this->reads);
+      output += "k. number of L2 read misses:          ";
+      cat_padded(&output, this->read_misses);
+      output += "l. number of L2 writes:               ";
+      cat_padded(&output, this->writes);
+      output += "m. number of L2 write misses:         ";
+      cat_padded(&output, this->write_misses);
+      output += "n. L2 miss rate:                      ";
+      cat_padded(&output, 0.0); //Todo miss rate
+      output += "o. number of writebacks from L2:      ";
+      cat_padded(&output, this->write_backs);
+      output += "p. total memory traffic:              ";
+      cat_padded(&output, (this->next_level->reads + this->next_level->writes));
+   }
+   else
+   {
+      output += "j. number of L2 reads:                ";
+      cat_padded(&output, (uint_fast32_t) 0);
+      output += "k. number of L2 read misses:          ";
+      cat_padded(&output, (uint_fast32_t) 0);
+      output += "l. number of L2 writes:               ";
+      cat_padded(&output, (uint_fast32_t) 0);
+      output += "m. number of L2 write misses:         ";
+      cat_padded(&output, (uint_fast32_t) 0);
+      output += "n. L2 miss rate:                      ";
+      cat_padded(&output, 0.0); //Todo miss rate
+      output += "o. number of writebacks from L2:      ";
+      cat_padded(&output, (uint_fast32_t)  0);
+      output += "p. total memory traffic:              ";
+      cat_padded(&output, (this->reads + this->writes));
+   }
+   std::cout << output;
+}
+
+// Attach a numeric value to the end of a string with space padding
+void Cache::cat_padded(std::string *str, uint_fast32_t n) {
+   std::string value = std::to_string(n);
+   while(value.length() < 12)
+      value = " " + value;
+   value += "\n";
+   *str += value;
+}
+
+// Attach a numeric value to the end of a string with space padding
+void Cache::cat_padded(std::string *str, double n) {
+   std::string value = std::to_string(n).substr(0,6);
+   while(value.length() < 12)
+      value = " " + value;
+   value += "\n";
+   *str += value;
 }
