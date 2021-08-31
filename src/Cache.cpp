@@ -100,26 +100,6 @@ void Cache::read(unsigned long &addr){
          for (Block &traversal_block : sets[index].blocks)
              ++traversal_block.recency;
       oldest_block->recency = 0;
-
-
-
-
-      /*uint_fast32_t temp_recency = 0;
-      uint8_t chosen_block = 0, counter = 0;
-
-      // Traverse the set, looking for oldest block and updating age of blocks
-      for(Block &bl : sets[index].blocks){
-         if(!bl.valid || bl.recency > temp_recency)
-            chosen_block = counter;
-         ++bl.recency;
-         ++counter;
-      }
-
-      // Evict old data, and admit new data
-      sets[index].blocks[chosen_block].recency = 0;
-      sets[index].blocks[chosen_block].valid = true;
-      sets[index].blocks[chosen_block].tag = tag;
-      sets[index].blocks[chosen_block].dirty = false;*/
    }
    else {
       ++read_hits;
@@ -209,7 +189,7 @@ void Cache::contents_report() {
    this ->next_level->contents_report();
 }
 
-//WARNING: Destructive!
+
 void Cache::cache_line_report(uint8_t set_num) {
    //  set   0:   20028d D  20018a
    std::string output = "  set  ";
@@ -248,16 +228,6 @@ void Cache::statistics_report() {
       return;
    }
    L2_stats_report();
-   /*switch (level) {
-      case 0x01:
-         L1_stats_report();
-         next_level->statistics_report();
-         break;
-      default:
-         L2_stats_report();
-         break;
-   }
-   */
 }
 
 void Cache::L1_stats_report() {
