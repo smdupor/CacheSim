@@ -187,9 +187,7 @@ void Cache::contents_report() {
    this->next_level->contents_report();
 }
 
-
 void Cache::cache_line_report(uint8_t set_num) {
-   //  set   0:   20028d D  20018a
    std::string output = "  set  ";
    if (set_num <= 9)
       output += " ";
@@ -219,7 +217,6 @@ void Cache::cache_line_report(uint8_t set_num) {
 }
 
 void Cache::statistics_report() {
-
    if (this->level == 1) {
       L1_stats_report();
       next_level->statistics_report();
