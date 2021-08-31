@@ -136,7 +136,67 @@ void Cache::read(unsigned long &addr){
 }
 
 void Cache::write(unsigned long &addr) {
+   if(this->main_memory) {
+      ++this->writes;
+      return;
+   }
 
+   // Separate tag, index, block offset
+   uint_fast32_t tag = addr >> (index_length + block_length);
+   uint_fast32_t index = addr - (tag << (index_length + block_length));
+   index  = index >> block_length;
+
+   // Search the set at the calculated index for the requested block
+   auto block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
+      return b.valid && b.tag == tag;
+   });
+
+   if(block == sets[index].blocks.end()) {
+      //MISS
+      ++write_misses;
+
+      // Get this block from the next level
+      next_level->read(addr);
+
+      // Assuming success at higher level, emplace into this cache
+      // Find Oldest block
+      auto oldest_block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
+         return b.recency == local_assoc - 1;
+      });
+
+      // If dirty, writeback
+      if(oldest_block->dirty) {
+         ++write_backs;
+         next_level->write(addr);
+      }
+
+      // Emplace block into set
+      oldest_block->valid = true;
+      oldest_block->tag = tag;
+
+      // WRITE TO this block, and set dirty bit.
+      oldest_block->dirty = true;
+
+      // Traverse and update recency
+
+      for (Block &traversal_block : sets[index].blocks)
+         ++traversal_block.recency;
+      oldest_block->recency = 0;
+   }
+   else //HIT
+   {
+      block->dirty = true;
+      ++write_hits;
+
+      //If the recency hierarchy has changed, traverse the set and update recencies
+      if(block->recency != 0) {
+         for (Block &traversal_block : sets[index].blocks)
+            if (traversal_block.recency < block->recency)
+               ++traversal_block.recency;
+         block->recency = 0;
+      }
+   }
+   ++writes;
 }
 
 void Cache::contents_report() {
