@@ -17,7 +17,7 @@ Cache::Cache(cache_params params, uint8_t level) {
    this->params = params;
    this->level = level;
    this->main_memory = false;
-   reads=0, read_misses=0, read_hits=0, writes=0, write_misses=0, write_hits=0, vc_swaps=0;
+   reads=0, read_misses=0, read_hits=0, writes=0, write_misses=0, write_hits=0, vc_swaps=0, write_backs=0;
 
    switch(level) {
       case 0xff: // This is a main  memory
@@ -62,21 +62,49 @@ void Cache::read(unsigned long &addr){
       return;
    }
 
+   // Separate tag, index, block offset
    uint_fast32_t tag = addr >> (index_length + block_length);
    uint_fast32_t index = addr - (tag << (index_length + block_length));
    index  = index >> block_length;
 
-   auto b = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
+   // Search the set at the calculated index for the requested block
+   auto block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
       return b.valid && b.tag == tag;
    });
-   if(b == sets[index].blocks.end()) {
+
+   if(block == sets[index].blocks.end()) {
       //MISS
       ++read_misses;
 
       next_level->read(addr);
 
       // Assuming success at higher level, emplace into this cache
-      uint_fast32_t temp_recency = 0;
+      // Find Oldest block
+      auto oldest_block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
+         return b.recency == local_assoc - 1;
+      });
+
+      // If dirty, writeback
+      if(oldest_block->dirty) {
+         ++write_backs;
+         next_level->write(addr);
+      }
+
+      // Emplace block into set
+      oldest_block->valid = true;
+      oldest_block->tag = tag;
+      oldest_block->dirty = false;
+
+      // Traverse and update recency
+
+         for (Block &traversal_block : sets[index].blocks)
+             ++traversal_block.recency;
+      oldest_block->recency = 0;
+
+
+
+
+      /*uint_fast32_t temp_recency = 0;
       uint8_t chosen_block = 0, counter = 0;
 
       // Traverse the set, looking for oldest block and updating age of blocks
@@ -91,19 +119,18 @@ void Cache::read(unsigned long &addr){
       sets[index].blocks[chosen_block].recency = 0;
       sets[index].blocks[chosen_block].valid = true;
       sets[index].blocks[chosen_block].tag = tag;
-      sets[index].blocks[chosen_block].dirty = false;
+      sets[index].blocks[chosen_block].dirty = false;*/
    }
    else {
       ++read_hits;
-      //Traverse the set and update recency of access
-      for(Block &bl : sets[index].blocks){
-         if(bl.recency != 0 && bl.recency != 0xff)
-            ++bl.recency;
+
+      //If the recency hierarchy has changed, traverse the set and update recencies
+      if(block->recency != 0) {
+         for (Block &traversal_block : sets[index].blocks)
+            if (traversal_block.recency < block->recency)
+               ++traversal_block.recency;
+         block->recency = 0;
       }
-
-      b->recency = 0;
-
-
    }
    ++reads;
 }
@@ -122,6 +149,7 @@ void Cache::contents_report() {
    this ->next_level->contents_report();
 }
 
+//WARNING: Destructive!
 void Cache::cache_line_report(uint8_t set_num) {
    //  set   0:   20028d D  20018a
    std::string output = "  set  ";

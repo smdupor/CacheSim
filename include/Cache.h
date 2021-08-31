@@ -14,15 +14,15 @@
 #include <vector>
 
 typedef struct Block {
-   explicit Block() {
+   explicit Block(uint_fast32_t init_recency) {
      tag = 0;
      valid = false;
-     recency = 0;
+     recency = init_recency;
      dirty = false;
    };
    uint_fast32_t tag;
    bool valid;
-   uint8_t recency;
+   uint_fast32_t recency;
    bool dirty;
    bool operator < (const Block i) const {
       return (recency < i.recency);
@@ -30,9 +30,9 @@ typedef struct Block {
 } cache_blocks;
 
 typedef struct Set{
-   explicit Set(uint8_t size) {
+   explicit Set(uint_fast32_t size) {
       for(size_t i =0; i< size; ++i){
-         blocks.emplace_back(cache_blocks());
+         blocks.emplace_back(cache_blocks(i));
       }
    };
    std::vector<cache_blocks> blocks;
@@ -55,8 +55,8 @@ private:
    // System-Level Vars
    std::chrono::time_point<std::chrono::steady_clock> sim_start;
    bool main_memory;
-   uint_fast32_t reads, read_hits, read_misses, writes, write_hits, write_misses, vc_swaps;
-   uint8_t tag_length, index_length, block_length, block_size, local_assoc, level;
+   uint_fast32_t reads, read_hits, read_misses, writes, write_hits, write_misses, vc_swaps, write_backs;
+   uint_fast32_t tag_length, index_length, block_length, block_size, local_assoc, level;
    uint_fast32_t num_sets, local_size;
    Cache *next_level;
    cache_params params;
