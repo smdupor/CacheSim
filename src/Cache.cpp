@@ -102,8 +102,8 @@ void Cache::read(unsigned long &addr) {
          return b.recency == local_assoc - 1;
       });
 
-      if(victim_cache && victim_cache.vc_exists(addr)) {
-         victim_cache.vc_swap(&*oldest_block, addr);
+      if(victim_cache && victim_cache->vc_exists(addr)) {
+         victim_cache->vc_swap(&*oldest_block, addr);
          ++vc_swaps;
          ++vc_swap_requests;
 
@@ -112,8 +112,8 @@ void Cache::read(unsigned long &addr) {
                ++traversal_block.recency;
          oldest_block->recency = 0;
          return;
-      } else if (victim_cache && !victim_cache.vc_exists(addr)) {
-         victim_cache.vc_replace(&*oldest_block);
+      } else if (victim_cache && !victim_cache->vc_exists(addr)) {
+         victim_cache->vc_replace(&*oldest_block);
          ++vc_swap_requests;
       }
          next_level->read(addr);
@@ -175,9 +175,7 @@ inline void Cache::vc_swap(Block *b, unsigned long &addr) {
    // L1 Cache. Perhaps we should just swap the dirty bits, then handle updating the tag in the caller function??????
 
 
-   uint_fast32_t
-   return block != sets[index].blocks.end();
-
+   uint_fast32_t temp;
 }
 
 inline void Cache::vc_replace(Block *b) {
