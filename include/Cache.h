@@ -60,12 +60,14 @@ private:
    uint_fast32_t tag_length, index_length, block_length, block_size, local_assoc, level;
    uint_fast32_t num_sets, local_size;
    Cache *next_level;
+   Cache *victim_cache;
    cache_params params;
    std::vector<Set> sets;
 
    // Current Access indices
    uint_fast32_t current_index, current_tag;
    inline void initialize_cache_memory();
+
    void cache_line_report(uint8_t set_num);
    void L1_stats_report();
    void L2_stats_report();
@@ -74,9 +76,13 @@ private:
 
 public:
    Cache(cache_params params, uint8_t level);
+   Cache(uint_fast32_t num_blocks, uint_fast32_t blocksize);
    ~Cache();
    void read(unsigned long &addr);
    void write(unsigned long &addr);
+   inline bool vc_exists(uint_fast32_t addr);
+   inline void vc_replace(Block *b);
+   inline void vc_swap(Block *b, unsigned long &addr);
    void contents_report();
    void statistics_report();
 };
