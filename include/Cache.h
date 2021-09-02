@@ -74,15 +74,17 @@ private:
    void cat_padded(std::string *str, uint_fast32_t n);
    void cat_padded(std::string *str, double n);
 
+   void extract_tag_index(uint_fast32_t *tag, uint_fast32_t *index, const uint_fast32_t *addr);
+
 public:
    Cache(cache_params params, uint8_t level);
    Cache(uint_fast32_t num_blocks, uint_fast32_t blocksize);
    ~Cache();
-   void read(unsigned long &addr);
-   void write(unsigned long &addr);
+   void read(const unsigned long &addr);
+   void write(const unsigned long &addr);
    inline bool vc_exists(uint_fast32_t addr);
    inline void vc_replace(Block *b);
-   inline void vc_swap(Block *b, unsigned long &addr);
+   inline void vc_swap(Block *incoming_block, const unsigned long &addr);
    void contents_report();
    void statistics_report();
 };

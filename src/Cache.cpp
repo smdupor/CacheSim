@@ -79,7 +79,7 @@ inline void Cache::initialize_cache_memory() {
 // Stub destructor
 Cache::~Cache() = default;
 
-void Cache::read(unsigned long &addr) {
+void Cache::read(const unsigned long &addr) {
    if (this->main_memory) {
       ++this->reads;
       return;
@@ -87,7 +87,7 @@ void Cache::read(unsigned long &addr) {
 
    // Separate tag, index, block offset
    uint_fast32_t tag = addr >> (index_length + block_length);
-   uint_fast32_t index = addr - (tag << (index_length + block_length));
+   uint_fast32_t index = addr - (((const uint_fast32_t) tag) << (index_length + block_length));
    index = index >> block_length;
 
    // Search the set at the calculated index for the requested block
@@ -160,16 +160,22 @@ inline bool Cache::vc_exists(uint_fast32_t addr) {
    return block != sets[index].blocks.end();
 }
 
+inline void Cache::extract_tag_index(uint_fast32_t *tag, uint_fast32_t *index, const unsigned long *addr) {
+   *tag = *addr >> (index_length + block_length);
+   *index = *addr - (*tag << (index_length + block_length));
+   *index = *index >> block_length;
+}
 
-inline void Cache::vc_swap(Block *b, unsigned long &addr) {
+inline void Cache::vc_swap(Block *incoming_block, const unsigned long &addr) {
 // Swap data WITHOUT changing recency of incoming block, but changing recency in VC
-   uint_fast32_t tag = addr >> (index_length + block_length);
-   uint_fast32_t index = addr - (tag << (index_length + block_length));
-   index = index >> block_length;
+   uint_fast32_t tag, index;
+   extract_tag_index(&tag, &index, &addr);
 
-   auto block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
+   auto outgoing_block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
       return b.valid && b.tag == tag;
    });
+
+
 
    // STOPPING POINT: Problem: VC should, really, not change the returned block b/c it doesn't have tag info for the
    // L1 Cache. Perhaps we should just swap the dirty bits, then handle updating the tag in the caller function??????
@@ -184,7 +190,7 @@ inline void Cache::vc_replace(Block *b) {
 
 }
 
-void Cache::write(unsigned long &addr) {
+void Cache::write(const unsigned long &addr) {
    if (this->main_memory) {
       ++this->writes;
       return;
