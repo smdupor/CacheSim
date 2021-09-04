@@ -58,7 +58,7 @@ private:
    bool main_memory;
    uint_fast32_t reads, read_hits, read_misses, writes, write_hits, write_misses, vc_swaps, write_backs, vc_swap_requests;
    uint_fast32_t tag_length, index_length, block_length, block_size, local_assoc, level;
-   uint_fast32_t num_sets, local_size;
+   uint_fast32_t num_sets, local_size, count;
    Cache *next_level;
    Cache *victim_cache;
    cache_params params;
@@ -87,6 +87,8 @@ public:
    inline void vc_swap(Block *incoming_block, const unsigned long &wanted_addr, const unsigned long &sent_addr);
    void contents_report();
    void statistics_report();
+   bool
+   attempt_vc_swap(const unsigned long &addr, uint_fast32_t index, std::vector<cache_blocks>::iterator &oldest_block);
 };
 
 #endif //CACHESIM_INCLUDE_CACHE_H

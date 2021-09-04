@@ -17,7 +17,7 @@ Cache::Cache(cache_params params, uint8_t level) {
    this->params = params;
    this->level = level;
    this->main_memory = false;
-   reads = 0, read_misses = 0, read_hits = 0, writes = 0, write_misses = 0, write_hits = 0, vc_swaps = 0, write_backs = 0, vc_swap_requests = 0;
+   reads = 0, read_misses = 0, read_hits = 0, writes = 0, write_misses = 0, write_hits = 0, vc_swaps = 0, write_backs = 0, vc_swap_requests = 0, count=0;
 
    switch (level) {
       case 0xff: // This is a main  memory
@@ -102,13 +102,14 @@ void Cache::read(const unsigned long &addr) {
       auto oldest_block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
          return b.recency == local_assoc - 1;
       });
-
+/*
       if(victim_cache && victim_cache->vc_exists(addr)) {
          // vc has it, swap
          victim_cache->vc_swap(&*oldest_block, addr,(((oldest_block->tag << index_length)+index)<<block_length));
          oldest_block->tag = oldest_block->tag >> index_length;
 
          Block debug = *oldest_block;
+         ++vc_swap_requests;
          ++vc_swaps;
 
 
@@ -121,25 +122,38 @@ void Cache::read(const unsigned long &addr) {
       } else if (victim_cache && !victim_cache->vc_exists(addr) && oldest_block->valid) {
          //vs doesn't have it, push it into vc, writeback what we got out of vc, continue
          victim_cache->vc_replace(&*oldest_block,((oldest_block->tag << index_length) + index) << block_length );
-         oldest_block->tag = oldest_block->tag >> index_length;
+
 
          //if what we got from VC is dirty, writeback
          if(oldest_block->dirty && oldest_block->valid) {
-            next_level->write(((oldest_block->tag << index_length) + index) << block_length);
+            next_level->write(oldest_block->tag<<block_length);
             oldest_block->dirty = false;
             ++write_backs;
          }
+         oldest_block->tag = oldest_block->tag >> index_length;
 
          ++vc_swap_requests;
       }
+*/
+      if(attempt_vc_swap(addr, index, oldest_block)) {
+         ++reads;
 
-         next_level->read(addr);
+            for (Block &traversal_block : sets[index].blocks)
+               if (traversal_block.recency < oldest_block->recency)
+                  ++traversal_block.recency;
+            oldest_block->recency = 0;
+
+         return;
+      }
+
+
 
       // If dirty, writeback
       if (oldest_block->dirty) {
          ++write_backs;
          next_level->write(addr);
       }
+      next_level->read(addr);
 
       // Emplace block into set
       oldest_block->valid = true;
@@ -149,7 +163,8 @@ void Cache::read(const unsigned long &addr) {
       // Traverse and update recency
 
       for (Block &traversal_block : sets[index].blocks)
-         ++traversal_block.recency;
+         if (traversal_block.recency < oldest_block->recency)
+            ++traversal_block.recency;
       oldest_block->recency = 0;
    } else {
       ++read_hits;
@@ -231,6 +246,7 @@ inline void Cache::vc_replace(Block *incoming_block, const unsigned long &sent_a
       return b.recency == local_assoc - 1;
    });
 
+   Block debug = *oldest_block;
    // swap the dirty bits
    bool temp_dirty = oldest_block->dirty;
    oldest_block->dirty = incoming_block->dirty;
@@ -278,34 +294,17 @@ void Cache::write(const unsigned long &addr) {
       auto oldest_block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
          return b.recency == local_assoc - 1;
       });
-      if(victim_cache && victim_cache->vc_exists(addr)) {
-         // vc has it, swap
-         victim_cache->vc_swap(&*oldest_block, addr, (((oldest_block->tag << index_length)+index)<<block_length));
-         oldest_block->tag = oldest_block->tag >> index_length;
-
-         ++vc_swaps;
-
-
-         for (Block &traversal_block : sets[index].blocks)
-            if(traversal_block.recency < oldest_block->recency)
-               ++traversal_block.recency;
-         oldest_block->recency = 0;
+      if(attempt_vc_swap(addr, index, oldest_block)) {
+         if (oldest_block->recency != 0) {
+            for (Block &traversal_block : sets[index].blocks)
+               if (traversal_block.recency < oldest_block->recency)
+                  ++traversal_block.recency;
+            oldest_block->recency = 0;
+         }
          ++writes;
          return;
-      } else if (victim_cache && !victim_cache->vc_exists(addr) && oldest_block->valid) {
-         //vs doesn't have it, push it into vc, writeback what we got out of vc, continue
-         victim_cache->vc_replace(&*oldest_block,((oldest_block->tag << index_length) + index) << block_length );
-         oldest_block->tag = oldest_block->tag >> index_length;
-
-         //if what we got from VC is dirty, writeback
-         if(oldest_block->dirty && oldest_block->valid) {
-            next_level->write(((oldest_block->tag << index_length) + index) << block_length);
-            oldest_block->dirty = false;
-            ++write_backs;
-         }
-
-         ++vc_swap_requests;
       }
+
 
 
 
@@ -331,6 +330,7 @@ void Cache::write(const unsigned long &addr) {
       // Traverse and update recency
 
       for (Block &traversal_block : sets[index].blocks)
+         if (traversal_block.recency < oldest_block->recency)
          ++traversal_block.recency;
       oldest_block->recency = 0;
    } else //HIT
@@ -347,6 +347,37 @@ void Cache::write(const unsigned long &addr) {
       }
    }
    ++writes;
+}
+
+bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
+                            std::vector<cache_blocks>::iterator &oldest_block) {
+   if(victim_cache && victim_cache->vc_exists(addr)) {
+      // vc has it, swap
+      victim_cache->vc_swap(&*oldest_block, addr, (((oldest_block->tag << index_length) + index) << block_length));
+      oldest_block->tag = oldest_block->tag >> index_length;
+      ++vc_swap_requests;
+      ++vc_swaps;
+      for (Block &traversal_block : sets[index].blocks)
+         if(traversal_block.recency < oldest_block->recency)
+            ++traversal_block.recency;
+      oldest_block->recency = 0;
+      return true;
+   } else if (victim_cache && !victim_cache->vc_exists(addr) && oldest_block->valid) {
+      //vs doesn't have it, push it into vc, writeback what we got out of vc, continue
+      victim_cache->vc_replace(&*oldest_block, ((oldest_block->tag << index_length) + index) << block_length);
+
+
+      //if what we got from VC is dirty, writeback
+   /*   if(oldest_block->dirty && oldest_block->valid) {
+         next_level->write(oldest_block->tag << block_length);
+         oldest_block->dirty = false;
+         ++write_backs;
+      }*/
+      oldest_block->tag = oldest_block->tag >> index_length;
+
+      ++vc_swap_requests;
+   }
+   return false;
 }
 
 void Cache::contents_report() {
