@@ -83,8 +83,8 @@ public:
    void read(const unsigned long &addr);
    void write(const unsigned long &addr);
    inline bool vc_exists(uint_fast32_t addr);
-   inline void vc_replace(Block *b);
-   inline void vc_swap(Block *incoming_block, const unsigned long &addr);
+   inline void vc_replace(Block *b, const unsigned long &sent_addr);
+   inline void vc_swap(Block *incoming_block, const unsigned long &wanted_addr, const unsigned long &sent_addr);
    void contents_report();
    void statistics_report();
 };

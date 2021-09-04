@@ -54,12 +54,12 @@ Cache::Cache(uint_fast32_t num_blocks, uint_fast32_t blocksize) {
    this->main_memory = false;
    reads = 0, read_misses = 0, read_hits = 0, writes = 0, write_misses = 0, write_hits = 0, vc_swaps = 0, write_backs = 0, vc_swap_requests = 0;
    block_size=blocksize;
-   local_assoc = 0;
+   local_assoc = num_blocks;
 
-   for (size_t i = 0; i < num_blocks; ++i) {
+   //for (size_t i = 0; i < num_blocks; ++i) {
       sets.emplace_back(Set(local_assoc));
-   }
-   index_length = log2(num_sets);
+   //}
+   index_length = 0;
    block_length = log2(block_size);
    tag_length = address_length - index_length - block_length;
 
@@ -95,29 +95,46 @@ void Cache::read(const unsigned long &addr) {
       return b.valid && b.tag == tag;
    });
 
+   // Not found
    if (block == sets[index].blocks.end()) {
-
+      ++read_misses;
       // Find Oldest block
       auto oldest_block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
          return b.recency == local_assoc - 1;
       });
 
       if(victim_cache && victim_cache->vc_exists(addr)) {
-         victim_cache->vc_swap(&*oldest_block, addr);
+         // vc has it, swap
+         victim_cache->vc_swap(&*oldest_block, addr,(((oldest_block->tag << index_length)+index)<<block_length));
+         oldest_block->tag = oldest_block->tag >> index_length;
+
+         Block debug = *oldest_block;
          ++vc_swaps;
-         ++vc_swap_requests;
+
 
          for (Block &traversal_block : sets[index].blocks)
             if(traversal_block.recency < oldest_block->recency)
                ++traversal_block.recency;
          oldest_block->recency = 0;
+         ++reads;
          return;
-      } else if (victim_cache && !victim_cache->vc_exists(addr)) {
-         victim_cache->vc_replace(&*oldest_block);
+      } else if (victim_cache && !victim_cache->vc_exists(addr) && oldest_block->valid) {
+         //vs doesn't have it, push it into vc, writeback what we got out of vc, continue
+         victim_cache->vc_replace(&*oldest_block,((oldest_block->tag << index_length) + index) << block_length );
+         oldest_block->tag = oldest_block->tag >> index_length;
+
+         //if what we got from VC is dirty, writeback
+         if(oldest_block->dirty && oldest_block->valid) {
+            next_level->write(((oldest_block->tag << index_length) + index) << block_length);
+            oldest_block->dirty = false;
+            ++write_backs;
+         }
+
          ++vc_swap_requests;
       }
+
          next_level->read(addr);
-         ++read_misses;
+
       // If dirty, writeback
       if (oldest_block->dirty) {
          ++write_backs;
@@ -149,15 +166,19 @@ void Cache::read(const unsigned long &addr) {
 }
 
 inline bool Cache::vc_exists(uint_fast32_t addr) {
-   uint_fast32_t tag = addr >> (index_length + block_length);
-   uint_fast32_t index = addr - (tag << (index_length + block_length));
-   index = index >> block_length;
+   uint_fast32_t tag = addr >> (block_length);
+   uint_fast32_t index = 0;
+   index = 0;
 
    auto block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
       return b.valid && b.tag == tag;
    });
 
-   return block != sets[index].blocks.end();
+   Block debug = *block;
+
+   if (block == sets[index].blocks.end())
+      return false;
+   return true;
 }
 
 inline void Cache::extract_tag_index(uint_fast32_t *tag, uint_fast32_t *index, const unsigned long *addr) {
@@ -166,27 +187,71 @@ inline void Cache::extract_tag_index(uint_fast32_t *tag, uint_fast32_t *index, c
    *index = *index >> block_length;
 }
 
-inline void Cache::vc_swap(Block *incoming_block, const unsigned long &addr) {
+inline void Cache::vc_swap(Block *incoming_block, const unsigned long &wanted_addr, const unsigned long &sent_addr) {
 // Swap data WITHOUT changing recency of incoming block, but changing recency in VC
-   uint_fast32_t tag, index;
-   extract_tag_index(&tag, &index, &addr);
+   uint_fast32_t wanted_tag=wanted_addr>>block_length, wanted_index=0;
+   uint_fast32_t sent_tag = sent_addr>>block_length;
+   //extract_tag_index(&wanted_tag, &wanted_index, &wanted_addr);
 
-   auto outgoing_block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
-      return b.valid && b.tag == tag;
+   auto outgoing_block = *std::find_if(sets[wanted_index].blocks.begin(), sets[wanted_index].blocks.end(), [&](Block b) {
+      return b.valid && b.tag == wanted_tag;
    });
 
+   // swap the dirty bits
+   bool temp_dirty = outgoing_block.dirty;
+   outgoing_block.dirty = incoming_block->dirty;
+   incoming_block->dirty = temp_dirty;
+
+   // Swap the tags. In the caller, we must right shift the wanted_index out
+
+   incoming_block->tag = outgoing_block.tag;
+   outgoing_block.tag = sent_tag;
+
+   incoming_block->valid = outgoing_block.valid;
+   outgoing_block.valid = true;
 
 
-   // STOPPING POINT: Problem: VC should, really, not change the returned block b/c it doesn't have tag info for the
-   // L1 Cache. Perhaps we should just swap the dirty bits, then handle updating the tag in the caller function??????
-
-
-   uint_fast32_t temp;
+   //If the recency hierarchy has changed, traverse the set and update recencies
+   if (outgoing_block.recency != 0) {
+      for (Block &traversal_block : sets[wanted_index].blocks)
+         if (traversal_block.recency < outgoing_block.recency)
+            ++traversal_block.recency;
+      outgoing_block.recency = 0;
+   }
 }
 
-inline void Cache::vc_replace(Block *b) {
+inline void Cache::vc_replace(Block *incoming_block, const unsigned long &sent_addr) {
    // Emplace this block into the VC, in place of oldest block. If oldest block is invalid/available, ensure dirty
    //bit is cleared so no writeback is called.
+   uint_fast32_t sent_tag = sent_addr>>block_length, sent_index=0;
+   //extract_tag_index(&sent_tag, &sent_index, &sent_addr);
+
+   // Find Oldest block
+   auto oldest_block = std::find_if(sets[sent_index].blocks.begin(), sets[sent_index].blocks.end(), [&](Block b) {
+      return b.recency == local_assoc - 1;
+   });
+
+   // swap the dirty bits
+   bool temp_dirty = oldest_block->dirty;
+   oldest_block->dirty = incoming_block->dirty;
+   incoming_block->dirty = temp_dirty;
+
+   // Swap the tags. In the caller, we must right shift the sent_index out
+   incoming_block->tag = oldest_block->tag;
+   oldest_block->tag = sent_tag;
+
+   bool temp_valid = oldest_block->valid;
+   incoming_block->valid = oldest_block ->valid;
+   oldest_block->valid = true;
+
+
+   //If the recency hierarchy has changed, traverse the set and update recencies
+   if (oldest_block->recency != 0) {
+      for (Block &traversal_block : sets[sent_index].blocks)
+         if (traversal_block.recency < oldest_block->recency)
+            ++traversal_block.recency;
+      oldest_block->recency = 0;
+   }
 
 }
 
@@ -208,28 +273,40 @@ void Cache::write(const unsigned long &addr) {
 
    if (block == sets[index].blocks.end()) {
       //MISS
-
+      ++write_misses;
       // Find Oldest block
       auto oldest_block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
          return b.recency == local_assoc - 1;
       });
+      if(victim_cache && victim_cache->vc_exists(addr)) {
+         // vc has it, swap
+         victim_cache->vc_swap(&*oldest_block, addr, (((oldest_block->tag << index_length)+index)<<block_length));
+         oldest_block->tag = oldest_block->tag >> index_length;
 
-      if(victim_cache && vc_exists(addr)) {
-         vc_swap(&*oldest_block, addr);
          ++vc_swaps;
-         ++vc_swap_requests;
+
 
          for (Block &traversal_block : sets[index].blocks)
             if(traversal_block.recency < oldest_block->recency)
                ++traversal_block.recency;
          oldest_block->recency = 0;
-         oldest_block->dirty = true;
+         ++writes;
          return;
-      } else if (victim_cache && !vc_exists(addr)) {
-         vc_replace(&*oldest_block);
+      } else if (victim_cache && !victim_cache->vc_exists(addr) && oldest_block->valid) {
+         //vs doesn't have it, push it into vc, writeback what we got out of vc, continue
+         victim_cache->vc_replace(&*oldest_block,((oldest_block->tag << index_length) + index) << block_length );
+         oldest_block->tag = oldest_block->tag >> index_length;
+
+         //if what we got from VC is dirty, writeback
+         if(oldest_block->dirty && oldest_block->valid) {
+            next_level->write(((oldest_block->tag << index_length) + index) << block_length);
+            oldest_block->dirty = false;
+            ++write_backs;
+         }
+
          ++vc_swap_requests;
       }
-      ++write_misses;
+
 
 
 
@@ -275,10 +352,19 @@ void Cache::write(const unsigned long &addr) {
 void Cache::contents_report() {
    if (this->main_memory)
       return;
-   std::cout << "===== L" << std::to_string(this->level) << " contents =====\n";
+   else if(this->level==0xfe) {
+      std::cout << "===== VC contents =====\n";
+      cache_line_report(0);
+      return;
+   }
+   else
+      std::cout << "===== L" << std::to_string(this->level) << " contents =====\n";
+
    for (size_t i = 0; i < sets.size(); ++i)
       cache_line_report(i);
    std::cout << "\n";
+   if(victim_cache)
+      victim_cache->contents_report();
    this->next_level->contents_report();
 }
 
