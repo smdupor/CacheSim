@@ -354,6 +354,7 @@ void Cache::contents_report() {
    else if(this->level==0xfe) {
       std::cout << "===== VC contents =====\n";
       cache_line_report(0);
+      std::cout << std::endl;
       return;
    }
    else
@@ -369,7 +370,7 @@ void Cache::contents_report() {
 
 void Cache::cache_line_report(uint8_t set_num) {
    std::string output = "  set  ";
-   if (set_num <= 9)
+   if (set_num <= 9 )
       output += " ";
    output += std::to_string(set_num);
    output += ": ";
@@ -380,7 +381,7 @@ void Cache::cache_line_report(uint8_t set_num) {
 
    // Traverse the set and Convert the contents to a string
    for (Block &b : temp_set) {
-      output += "  ";
+      this->level == 0xfe ? output += " " : output += "  ";
       std::stringstream ss;
       ss << std::hex << b.tag;
       output += ss.str();
@@ -407,23 +408,23 @@ void Cache::statistics_report() {
 
 void Cache::L1_stats_report() {
    std::string output = "===== Simulation results =====\n";
-   output += "a. number of L1 reads:                ";
+   output += "  a. number of L1 reads:                ";
    cat_padded(&output, this->reads);
-   output += "b. number of L1 read misses:          ";
+   output += "  b. number of L1 read misses:          ";
    cat_padded(&output, this->read_misses);
-   output += "c. number of L1 writes:               ";
+   output += "  c. number of L1 writes:               ";
    cat_padded(&output, this->writes);
-   output += "d. number of L1 write misses:         ";
+   output += "  d. number of L1 write misses:         ";
    cat_padded(&output, this->write_misses);
-   output += "e. number of swap requests:           ";
+   output += "  e. number of swap requests:           ";
    cat_padded(&output, this->vc_swap_requests);
-   output += "f. swap request rate:                 ";
+   output += "  f. swap request rate:                 ";
    cat_padded(&output, 0.0); // TODO swap request rate
-   output += "g. number of swaps:                   ";
+   output += "  g. number of swaps:                   ";
    cat_padded(&output, this->vc_swaps);
-   output += "h. combined L1+VC miss rate:          ";
+   output += "  h. combined L1+VC miss rate:          ";
    cat_padded(&output, 0.0); // TODO l1+vc miss rate
-   output += "i. number writebacks from L1/VC:      ";
+   output += "  i. number writebacks from L1/VC:      ";
    cat_padded(&output, this->write_backs);
 
    std::cout << output;
@@ -433,34 +434,34 @@ void Cache::L2_stats_report() {
    std::string output = "";
 
    if (level == 2) {
-      output += "j. number of L2 reads:                ";
+      output += "  j. number of L2 reads:                ";
       cat_padded(&output, this->reads);
-      output += "k. number of L2 read misses:          ";
+      output += "  k. number of L2 read misses:          ";
       cat_padded(&output, this->read_misses);
-      output += "l. number of L2 writes:               ";
+      output += "  l. number of L2 writes:               ";
       cat_padded(&output, this->writes);
-      output += "m. number of L2 write misses:         ";
+      output += "  m. number of L2 write misses:         ";
       cat_padded(&output, this->write_misses);
-      output += "n. L2 miss rate:                      ";
+      output += "  n. L2 miss rate:                      ";
       cat_padded(&output, 0.0); //Todo miss rate
-      output += "o. number of writebacks from L2:      ";
+      output += "  o. number of writebacks from L2:      ";
       cat_padded(&output, this->write_backs);
-      output += "p. total memory traffic:              ";
+      output += "  p. total memory traffic:              ";
       cat_padded(&output, (this->next_level->reads + this->next_level->writes));
    } else {
-      output += "j. number of L2 reads:                ";
+      output += "  j. number of L2 reads:                ";
       cat_padded(&output, (uint_fast32_t) 0);
-      output += "k. number of L2 read misses:          ";
+      output += "  k. number of L2 read misses:          ";
       cat_padded(&output, (uint_fast32_t) 0);
-      output += "l. number of L2 writes:               ";
+      output += "  l. number of L2 writes:               ";
       cat_padded(&output, (uint_fast32_t) 0);
-      output += "m. number of L2 write misses:         ";
+      output += "  m. number of L2 write misses:         ";
       cat_padded(&output, (uint_fast32_t) 0);
-      output += "n. L2 miss rate:                      ";
+      output += "  n. L2 miss rate:                      ";
       cat_padded(&output, 0.0); //Todo miss rate
-      output += "o. number of writebacks from L2:      ";
+      output += "  o. number of writebacks from L2:      ";
       cat_padded(&output, (uint_fast32_t) 0);
-      output += "p. total memory traffic:              ";
+      output += "  p. total memory traffic:              ";
       cat_padded(&output, (this->reads + this->writes));
    }
    std::cout << output;
@@ -479,6 +480,15 @@ void Cache::cat_padded(std::string *str, uint_fast32_t n) {
 void Cache::cat_padded(std::string *str, double n) {
    std::string value = std::to_string(n).substr(0, 6);
    while (value.length() < 12)
+      value = " " + value;
+   value += "\n";
+   *str += value;
+}
+
+// Attach a numeric value to the end of a string with space padding
+void Cache::cat_padded(std::string *str, std::string *cat) {
+   std::string value = *cat;
+   while (value.length() < 16)
       value = " " + value;
    value += "\n";
    *str += value;

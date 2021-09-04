@@ -87,8 +87,9 @@ public:
    inline void vc_swap(Block *incoming_block, const unsigned long &wanted_addr, const unsigned long &sent_addr);
    void contents_report();
    void statistics_report();
-   bool
-   attempt_vc_swap(const unsigned long &addr, uint_fast32_t index, std::vector<cache_blocks>::iterator &oldest_block);
+   bool attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
+                        std::vector<cache_blocks>::iterator &oldest_block);
+   static void cat_padded(std::string *str, std::string *cat);
 };
 
 #endif //CACHESIM_INCLUDE_CACHE_H
