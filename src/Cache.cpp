@@ -102,39 +102,7 @@ void Cache::read(const unsigned long &addr) {
       auto oldest_block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
          return b.recency == local_assoc - 1;
       });
-/*
-      if(victim_cache && victim_cache->vc_exists(addr)) {
-         // vc has it, swap
-         victim_cache->vc_swap(&*oldest_block, addr,(((oldest_block->tag << index_length)+index)<<block_length));
-         oldest_block->tag = oldest_block->tag >> index_length;
 
-         Block debug = *oldest_block;
-         ++vc_swap_requests;
-         ++vc_swaps;
-
-
-         for (Block &traversal_block : sets[index].blocks)
-            if(traversal_block.recency < oldest_block->recency)
-               ++traversal_block.recency;
-         oldest_block->recency = 0;
-         ++reads;
-         return;
-      } else if (victim_cache && !victim_cache->vc_exists(addr) && oldest_block->valid) {
-         //vs doesn't have it, push it into vc, writeback what we got out of vc, continue
-         victim_cache->vc_replace(&*oldest_block,((oldest_block->tag << index_length) + index) << block_length );
-
-
-         //if what we got from VC is dirty, writeback
-         if(oldest_block->dirty && oldest_block->valid) {
-            next_level->write(oldest_block->tag<<block_length);
-            oldest_block->dirty = false;
-            ++write_backs;
-         }
-         oldest_block->tag = oldest_block->tag >> index_length;
-
-         ++vc_swap_requests;
-      }
-*/
       if(attempt_vc_swap(addr, index, oldest_block)) {
          ++reads;
 
@@ -145,8 +113,6 @@ void Cache::read(const unsigned long &addr) {
 
          return;
       }
-
-
 
       // If dirty, writeback
       if (oldest_block->dirty) {
@@ -208,30 +174,30 @@ inline void Cache::vc_swap(Block *incoming_block, const unsigned long &wanted_ad
    uint_fast32_t sent_tag = sent_addr>>block_length;
    //extract_tag_index(&wanted_tag, &wanted_index, &wanted_addr);
 
-   auto outgoing_block = *std::find_if(sets[wanted_index].blocks.begin(), sets[wanted_index].blocks.end(), [&](Block b) {
+   Block *outgoing_block = &*std::find_if(sets[wanted_index].blocks.begin(), sets[wanted_index].blocks.end(), [&](Block b) {
       return b.valid && b.tag == wanted_tag;
    });
 
    // swap the dirty bits
-   bool temp_dirty = outgoing_block.dirty;
-   outgoing_block.dirty = incoming_block->dirty;
+   bool temp_dirty = outgoing_block->dirty;
+   outgoing_block->dirty = incoming_block->dirty;
    incoming_block->dirty = temp_dirty;
 
    // Swap the tags. In the caller, we must right shift the wanted_index out
 
-   incoming_block->tag = outgoing_block.tag;
-   outgoing_block.tag = sent_tag;
+   incoming_block->tag = outgoing_block->tag;
+   outgoing_block->tag = sent_tag;
 
-   incoming_block->valid = outgoing_block.valid;
-   outgoing_block.valid = true;
+   incoming_block->valid = outgoing_block->valid;
+   outgoing_block->valid = true;
 
 
    //If the recency hierarchy has changed, traverse the set and update recencies
-   if (outgoing_block.recency != 0) {
+   if (outgoing_block->recency != 0) {
       for (Block &traversal_block : sets[wanted_index].blocks)
-         if (traversal_block.recency < outgoing_block.recency)
+         if (traversal_block.recency < outgoing_block->recency)
             ++traversal_block.recency;
-      outgoing_block.recency = 0;
+      outgoing_block->recency = 0;
    }
 }
 
@@ -301,6 +267,8 @@ void Cache::write(const unsigned long &addr) {
                   ++traversal_block.recency;
             oldest_block->recency = 0;
          }
+         // Actually write to the swapped-in block
+         oldest_block->dirty = true;
          ++writes;
          return;
       }
@@ -368,11 +336,11 @@ bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
 
 
       //if what we got from VC is dirty, writeback
-   /*   if(oldest_block->dirty && oldest_block->valid) {
+      if(oldest_block->dirty && oldest_block->valid) {
          next_level->write(oldest_block->tag << block_length);
          oldest_block->dirty = false;
          ++write_backs;
-      }*/
+      }
       oldest_block->tag = oldest_block->tag >> index_length;
 
       ++vc_swap_requests;

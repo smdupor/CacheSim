@@ -53,7 +53,7 @@ int main (int argc, char* argv[])
             params.vc_num_blocks, params.l2_size, params.l2_assoc, trace_file);
 
     char str[2];
-
+   long long count = 0;
     Cache L1 = Cache(params, 0x01);
 
     while(fscanf(FP, "%s %lx", str, &addr) != EOF)
@@ -70,7 +70,8 @@ int main (int argc, char* argv[])
 
            else if(rw == 'w')
            L1.write(addr);
-
+         //if(++count  ==136)
+           // break;
     }
 
     L1.contents_report();
