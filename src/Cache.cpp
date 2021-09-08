@@ -117,7 +117,7 @@ void Cache::read(const unsigned long &addr) {
       // If dirty, writeback
       if (oldest_block->dirty) {
          ++write_backs;
-         next_level->write(addr);
+         next_level->write(((oldest_block->tag << index_length) + index) << block_length);
       }
       next_level->read(addr);
 
@@ -283,7 +283,7 @@ void Cache::write(const unsigned long &addr) {
       // If dirty, writeback
       if (oldest_block->dirty) {
          ++write_backs;
-         next_level->write(addr);
+         next_level->write(((oldest_block->tag << index_length) + index) << block_length);
       }
       // Get this block from the next level
       next_level->read(addr);
@@ -337,7 +337,7 @@ bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
 
       //if what we got from VC is dirty, writeback
       if(oldest_block->dirty && oldest_block->valid) {
-         next_level->write(oldest_block->tag << block_length);
+         next_level->write(((oldest_block->tag << index_length) + index) << block_length);;
          oldest_block->dirty = false;
          ++write_backs;
       }
