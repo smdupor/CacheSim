@@ -39,15 +39,17 @@ int main (int argc, char* argv[])
     //TODO REMOVE FOR HERE FOR SUBMIT
    std::ofstream fp;
    fp.open("../logs.csv", std::ofstream::app);
+   params.l2_size = pow(2,16);
+   params.l2_assoc = 8;
 
-  params.l2_size = 0;
-   params.l2_assoc = 0;
-    for(size_t i=pow(2,10);i < pow(2,16);i*=2){
-      for(size_t j = 0; j < 4; j++) {
+    for(size_t j = 2; j < 5; j*=2){
+      for(size_t i=pow(2,10);i < pow(2,16);i*=2) {
          params.l1_size = i;
-         params.l1_assoc = 4;
+         params.l1_assoc = j;
+         params.vc_num_blocks = 0 ;// params.vc_num_blocks = j;
+
          //j == 16 ? params.l1_assoc = params.l1_size / params.block_size : params.l1_assoc = j;
-         params.block_size = pow(2,j)*16;
+         params.block_size = 32;
          // Open trace_file in read mode
          FP = fopen(trace_file, "r");
          if (FP == nullptr) {
@@ -92,7 +94,7 @@ int main (int argc, char* argv[])
             else if (rw == 'w')
                L1.write(addr);
          }
-         std::cout<< i << " " << params.block_size << std::endl;
+         std::cout<< params.l1_assoc << " " << params.l1_size << std::endl;
 
         // L1.contents_report();
 
