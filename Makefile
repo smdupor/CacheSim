@@ -1,4 +1,4 @@
-CXXFLAGS = -I include/ -g -Wall -fmessage-length=0 -std=c++11
+CXXFLAGS = -I include/ -g -O3 -Wall -fmessage-length=0 -std=c++11
 
 SRC_DIR_LIB=src
 SRC_DIR_EXE=main
@@ -23,8 +23,8 @@ $(OBJ_DIR_LIB)/%.o:	$(SRC_DIR_LIB)/%.cpp $(HEAD_FILES)
 	$(CXX) -o $@ -c $< $(CXXFLAGS)
 	
 $(BIN_DIR)/%:	$(OBJ_DIR_EXE)/%.o
-	#$(CXX) -o $@ -s $(subst $(BIN_DIR)/,$(OBJ_DIR_EXE)/,$@).o $(OBJ_FILES_LIB) $(HEAD_FILES) $(LDFLAGS) $(CXXFLAGS)
-	$(CXX) -o $@ $(subst $(BIN_DIR)/,$(OBJ_DIR_EXE)/,$@).o $(OBJ_FILES_LIB) $(HEAD_FILES) $(LDFLAGS) $(CXXFLAGS)
+	$(CXX) -o $@ -s $(subst $(BIN_DIR)/,$(OBJ_DIR_EXE)/,$@).o $(OBJ_FILES_LIB) $(HEAD_FILES) $(LDFLAGS) $(CXXFLAGS)
+	#$(CXX) -o $@ $(subst $(BIN_DIR)/,$(OBJ_DIR_EXE)/,$@).o $(OBJ_FILES_LIB) $(HEAD_FILES) $(LDFLAGS) $(CXXFLAGS)
 
 all:	PRE_REQ $(EXEC_FILES) $(OBJ_FILES_LIB)
 	@echo "Cleaning and Symlinking."

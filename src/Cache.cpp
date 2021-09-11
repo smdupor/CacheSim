@@ -334,7 +334,6 @@ bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
       //vs doesn't have it, push it into vc, writeback what we got out of vc, continue
       victim_cache->vc_replace(&*oldest_block, ((oldest_block->tag << index_length) + index) << block_length);
 
-
       //if what we got from VC is dirty, writeback
       if(oldest_block->dirty && oldest_block->valid) {
          next_level->write(oldest_block->tag  << block_length);
@@ -397,16 +396,17 @@ void Cache::cache_line_report(uint8_t set_num) {
    std::cout << output;
 }
 
-void Cache::statistics_report() {
+void Cache::statistics_report(std::string *csv) {
+
    if (this->level == 1) {
-      L1_stats_report();
-      next_level->statistics_report();
+      L1_stats_report(csv);
+      next_level->statistics_report(csv);
       return;
    }
-   L2_stats_report();
+   L2_stats_report(csv);
 }
 
-void Cache::L1_stats_report() {
+void Cache::L1_stats_report(std::string *csv) {
    std::string output = "===== Simulation results =====\n";
    output += "  a. number of L1 reads:                ";
    cat_padded(&output, this->reads);
@@ -426,11 +426,23 @@ void Cache::L1_stats_report() {
    cat_padded(&output, (double)std::round(10000*((double)(this->read_misses+this->write_misses-this->vc_swaps))/((double)(this->reads+this->writes)))/10000); // TODO l1+vc miss rate
    output += "  i. number writebacks from L1/VC:      ";
    cat_padded(&output, this->write_backs);
+   // Enable CSV Formatted output
+   if(csv) {
+      *csv += std::to_string(this->reads) + ", " +
+              std::to_string(this->read_misses) + ", " +
+              std::to_string(this->writes) + ", " +
+              std::to_string(this->write_misses) + ", " +
+              std::to_string(this->vc_swap_requests) + ", " +
+              std::to_string((double)std::round(10000*((double)this->vc_swap_requests)/((double)this->reads+(double)this->writes))/10000) + ", " +
+              std::to_string(this->vc_swaps) + ", " +
+              std::to_string((double)std::round(10000*((double)(this->read_misses+this->write_misses-this->vc_swaps))/((double)(this->reads+this->writes)))/10000) + ", " +
+              std::to_string(this->write_backs) + ", ";
+   }
 
-   std::cout << output;
+  // std::cout << output;
 }
 
-void Cache::L2_stats_report() {
+void Cache::L2_stats_report(std::string *csv) {
    std::string output = "";
 
    if (level == 2) {
@@ -448,6 +460,16 @@ void Cache::L2_stats_report() {
       cat_padded(&output, this->write_backs);
       output += "  p. total memory traffic:              ";
       cat_padded(&output, (this->next_level->reads + this->next_level->writes));
+      if(csv) {
+         *csv += std::to_string(this->reads) + ", " +
+                 std::to_string(this->read_misses) + ", " +
+                 std::to_string(this->writes) + ", " +
+                 std::to_string(this->write_misses) + ", " +
+                 std::to_string((double)std::round(10000*(double)this->read_misses / (double)this->reads)/10000) + ", " +
+                 std::to_string(this->write_backs) + ", " +
+                 std::to_string(next_level->get_traffic());
+         }
+
    } else {
       output += "  j. number of L2 reads:                ";
       cat_padded(&output, (uint_fast32_t) 0);
@@ -463,8 +485,16 @@ void Cache::L2_stats_report() {
       cat_padded(&output, (uint_fast32_t) 0);
       output += "  p. total memory traffic:              ";
       cat_padded(&output, (this->reads + this->writes));
+      if(csv){
+         *csv += "0, 0, 0, 0, 0.0, 0, " + std::to_string(this->reads + this->writes);
+      }
    }
-   std::cout << output;
+  // std::cout << output;
+}
+
+// Get total traffic for this level
+uint_fast32_t Cache::get_traffic() {
+   return (this->reads + this->writes);
 }
 
 // Attach a numeric value to the end of a string with space padding

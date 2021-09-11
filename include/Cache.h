@@ -69,8 +69,8 @@ private:
    inline void initialize_cache_memory();
 
    void cache_line_report(uint8_t set_num);
-   void L1_stats_report();
-   void L2_stats_report();
+   void L1_stats_report(std::string *csv);
+   void L2_stats_report(std::string *csv);
    void cat_padded(std::string *str, uint_fast32_t n);
    void cat_padded(std::string *str, double n);
 
@@ -86,10 +86,12 @@ public:
    inline void vc_replace(Block *b, const unsigned long &sent_addr);
    inline void vc_swap(Block *incoming_block, const unsigned long &wanted_addr, const unsigned long &sent_addr);
    void contents_report();
-   void statistics_report();
+   void statistics_report(std::string *csv);
    bool attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
                         std::vector<cache_blocks>::iterator &oldest_block);
    static void cat_padded(std::string *str, std::string *cat);
+   uint_fast32_t get_traffic();
+
 };
 
 #endif //CACHESIM_INCLUDE_CACHE_H
