@@ -337,7 +337,7 @@ bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
 
       //if what we got from VC is dirty, writeback
       if(oldest_block->dirty && oldest_block->valid) {
-         next_level->write(((oldest_block->tag << index_length) + index) << block_length);;
+         next_level->write(oldest_block->tag  << block_length);
          oldest_block->dirty = false;
          ++write_backs;
       }
@@ -419,11 +419,11 @@ void Cache::L1_stats_report() {
    output += "  e. number of swap requests:           ";
    cat_padded(&output, this->vc_swap_requests);
    output += "  f. swap request rate:                 ";
-   cat_padded(&output, 0.0); // TODO swap request rate
+   cat_padded(&output, (double)std::round(10000*((double)this->vc_swap_requests)/((double)this->reads+(double)this->writes))/10000); // TODO swap request rate
    output += "  g. number of swaps:                   ";
    cat_padded(&output, this->vc_swaps);
    output += "  h. combined L1+VC miss rate:          ";
-   cat_padded(&output, 0.0); // TODO l1+vc miss rate
+   cat_padded(&output, (double)std::round(10000*((double)(this->read_misses+this->write_misses-this->vc_swaps))/((double)(this->reads+this->writes)))/10000); // TODO l1+vc miss rate
    output += "  i. number writebacks from L1/VC:      ";
    cat_padded(&output, this->write_backs);
 
@@ -443,7 +443,7 @@ void Cache::L2_stats_report() {
       output += "  m. number of L2 write misses:         ";
       cat_padded(&output, this->write_misses);
       output += "  n. L2 miss rate:                      ";
-      cat_padded(&output, 0.0); //Todo miss rate
+      cat_padded(&output, (double)std::round(10000*(double)this->read_misses / (double)this->reads)/10000); //Todo miss rate
       output += "  o. number of writebacks from L2:      ";
       cat_padded(&output, this->write_backs);
       output += "  p. total memory traffic:              ";
