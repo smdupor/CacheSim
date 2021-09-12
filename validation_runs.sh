@@ -28,3 +28,6 @@ do
   echo "extra$j"
   diff -iw extra.$j z_Resources/extras/extra.$j.val.txt
 done
+
+rm extra.*
+rm gcc.*

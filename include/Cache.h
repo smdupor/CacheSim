@@ -48,17 +48,17 @@ typedef struct cache_params{
    unsigned long int l2_assoc;
 } cache_params;
 
+enum levels{L1 = 0x01, L2=0x02, VC=0xfe, MAIN_MEM=0xff};
+
 class Cache {
 
 private:
    //Constants
    const uint8_t address_length = 32;
    // System-Level Vars
-   std::chrono::time_point<std::chrono::steady_clock> sim_start;
    bool main_memory;
-   uint_fast32_t reads, read_hits, read_misses, writes, write_hits, write_misses, vc_swaps, write_backs, vc_swap_requests;
-   uint_fast32_t tag_length, index_length, block_length, block_size, local_assoc, level;
-   uint_fast32_t num_sets, local_size, count;
+   uint_fast32_t reads, read_hits, read_misses, writes, write_hits, write_misses, vc_swaps, write_backs,
+   vc_swap_requests, index_length, block_length, block_size, local_assoc, level, local_size;
    Cache *next_level;
    Cache *victim_cache;
    cache_params params;
@@ -67,6 +67,7 @@ private:
    // Current Access indices
    uint_fast32_t current_index, current_tag;
    inline void initialize_cache_memory();
+   inline void update_set_recency(Set &set, Block &block);
 
    void cache_line_report(uint8_t set_num);
    void L1_stats_report();

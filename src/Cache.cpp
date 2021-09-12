@@ -17,14 +17,15 @@ Cache::Cache(cache_params params, uint8_t level) {
    this->params = params;
    this->level = level;
    this->main_memory = false;
-   reads = 0, read_misses = 0, read_hits = 0, writes = 0, write_misses = 0, write_hits = 0, vc_swaps = 0, write_backs = 0, vc_swap_requests = 0, count=0;
+   reads = 0, read_misses = 0, read_hits = 0, writes = 0, write_misses = 0, write_hits = 0, vc_swaps = 0,
+      write_backs = 0, vc_swap_requests = 0;
 
    switch (level) {
-      case 0xff: // This is a main  memory
+      case MAIN_MEM: // This is a main  memory
          this->main_memory = true;
          victim_cache = nullptr;
          return;
-      case 0x01: // This is an L1 cache
+      case L1: // This is an L1 cache
          local_size = params.l1_size;
          local_assoc = params.l1_assoc;
          initialize_cache_memory();
@@ -34,15 +35,15 @@ Cache::Cache(cache_params params, uint8_t level) {
 
          ++level;
          if (params.l2_size == 0)
-            level = 0xff; // There is no L2 cache so the next level is Main Memory
+            level = MAIN_MEM; // There is no L2 cache so the next level is Main Memory
          next_level = new Cache(params, level);
          return;
-      case 0x02: // This is an L2 cache
+      case L2: // This is an L2 cache
          local_size = params.l2_size;
          local_assoc = params.l2_assoc;
          victim_cache = nullptr;
          initialize_cache_memory();
-         level = 0xff; // Force next level to main memory
+         level = MAIN_MEM; // Force next level to main memory
          next_level = new Cache(params, level);
          return;
    }
@@ -50,7 +51,7 @@ Cache::Cache(cache_params params, uint8_t level) {
 
 // Create a victim cache
 Cache::Cache(uint_fast32_t num_blocks, uint_fast32_t blocksize) {
-   this->level = 0xfe;
+   this->level = VC;
    this->main_memory = false;
    reads = 0, read_misses = 0, read_hits = 0, writes = 0, write_misses = 0, write_hits = 0, vc_swaps = 0, write_backs = 0, vc_swap_requests = 0;
    block_size=blocksize;
@@ -61,19 +62,19 @@ Cache::Cache(uint_fast32_t num_blocks, uint_fast32_t blocksize) {
    //}
    index_length = 0;
    block_length = log2(block_size);
-   tag_length = address_length - index_length - block_length;
+   //tag_length = address_length - index_length - block_length;
 
 }
 
 inline void Cache::initialize_cache_memory() {
    block_size = (uint8_t) params.block_size;
-   size_t num_sets = local_size / (local_assoc * block_size);
-   for (size_t i = 0; i < num_sets; ++i) {
+   size_t qty_sets = local_size / (local_assoc * block_size);
+   for (size_t i = 0; i < qty_sets; ++i) {
       sets.emplace_back(Set(local_assoc));
    }
-   index_length = log2(num_sets);
+   index_length = log2(qty_sets);
    block_length = log2(block_size);
-   tag_length = address_length - index_length - block_length;
+  // tag_length = address_length - index_length - block_length;
 }
 
 // Stub destructor
@@ -86,9 +87,8 @@ void Cache::read(const unsigned long &addr) {
    }
 
    // Separate tag, index, block offset
-   uint_fast32_t tag = addr >> (index_length + block_length);
-   uint_fast32_t index = addr - (((const uint_fast32_t) tag) << (index_length + block_length));
-   index = index >> block_length;
+   uint_fast32_t tag,index;
+   extract_tag_index(&tag, &index, &addr);
 
    // Search the set at the calculated index for the requested block
    auto block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
@@ -136,12 +136,13 @@ void Cache::read(const unsigned long &addr) {
       ++read_hits;
 
       //If the recency hierarchy has changed, traverse the set and update recencies
-      if (block->recency != 0) {
+     /* if (block->recency != 0) {
          for (Block &traversal_block : sets[index].blocks)
             if (traversal_block.recency < block->recency)
                ++traversal_block.recency;
-         block->recency = 0;
-      }
+         block->recency = 0;*/
+      update_set_recency(sets[index], *block);
+      //}
    }
    ++reads;
 }
@@ -166,6 +167,15 @@ inline void Cache::extract_tag_index(uint_fast32_t *tag, uint_fast32_t *index, c
    *tag = *addr >> (index_length + block_length);
    *index = *addr - (*tag << (index_length + block_length));
    *index = *index >> block_length;
+}
+
+inline void Cache::update_set_recency(Set &set, Block &block) {
+   if (block.recency != 0) {
+      for (Block &traversal_block: set.blocks)
+         if (traversal_block < block)
+            ++traversal_block.recency;
+      block.recency = 0;
+   }
 }
 
 inline void Cache::vc_swap(Block *incoming_block, const unsigned long &wanted_addr, const unsigned long &sent_addr) {
@@ -244,9 +254,8 @@ void Cache::write(const unsigned long &addr) {
    }
 
    // Separate tag, index, block offset
-   uint_fast32_t tag = addr >> (index_length + block_length);
-   uint_fast32_t index = addr - (tag << (index_length + block_length));
-   index = index >> block_length;
+   uint_fast32_t tag,index;
+   extract_tag_index(&tag, &index, &addr);
 
    // Search the set at the calculated index for the requested block
    auto block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
@@ -351,7 +360,7 @@ bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
 void Cache::contents_report() {
    if (this->main_memory)
       return;
-   else if(this->level==0xfe) {
+   else if(this->level==VC) {
       std::cout << "===== VC contents =====\n";
       cache_line_report(0);
       std::cout << std::endl;
@@ -381,7 +390,7 @@ void Cache::cache_line_report(uint8_t set_num) {
 
    // Traverse the set and Convert the contents to a string
    for (Block &b : temp_set) {
-      this->level == 0xfe ? output += " " : output += "  ";
+      this->level == VC ? output += " " : output += "  ";
       std::stringstream ss;
       ss << std::hex << b.tag;
       output += ss.str();
@@ -398,7 +407,7 @@ void Cache::cache_line_report(uint8_t set_num) {
 }
 
 void Cache::statistics_report() {
-   if (this->level == 1) {
+   if (this->level == L1) {
       L1_stats_report();
       next_level->statistics_report();
       return;
@@ -433,7 +442,7 @@ void Cache::L1_stats_report() {
 void Cache::L2_stats_report() {
    std::string output = "";
 
-   if (level == 2) {
+   if (level == L2) {
       output += "  j. number of L2 reads:                ";
       cat_padded(&output, this->reads);
       output += "  k. number of L2 read misses:          ";
