@@ -105,13 +105,7 @@ void Cache::read(const unsigned long &addr) {
 
       if(attempt_vc_swap(addr, index, oldest_block)) {
          ++reads;
-
-         /*   for (Block &traversal_block : sets[index].blocks)
-               if (traversal_block.recency < oldest_block->recency)
-                  ++traversal_block.recency;
-            oldest_block->recency = 0;*/
          update_set_recency(sets[index], *oldest_block);
-
          return;
       }
 
@@ -128,23 +122,12 @@ void Cache::read(const unsigned long &addr) {
       oldest_block->dirty = false;
 
       // Traverse and update recency
-
-     /* for (Block &traversal_block : sets[index].blocks)
-         if (traversal_block.recency < oldest_block->recency)
-            ++traversal_block.recency;
-      oldest_block->recency = 0;*/
       update_set_recency(sets[index], *oldest_block);
    } else {
       ++read_hits;
 
       //If the recency hierarchy has changed, traverse the set and update recencies
-     /* if (block->recency != 0) {
-         for (Block &traversal_block : sets[index].blocks)
-            if (traversal_block.recency < block->recency)
-               ++traversal_block.recency;
-         block->recency = 0;*/
       update_set_recency(sets[index], *block);
-      //}
    }
    ++reads;
 }
@@ -205,12 +188,6 @@ inline void Cache::vc_swap(Block *incoming_block, const unsigned long &wanted_ad
 
 
    //If the recency hierarchy has changed, traverse the set and update recencies
-   /*if (outgoing_block->recency != 0) {
-      for (Block &traversal_block : sets[wanted_index].blocks)
-         if (traversal_block.recency < outgoing_block->recency)
-            ++traversal_block.recency;
-      outgoing_block->recency = 0;
-   }*/
    update_set_recency(sets[wanted_index], *outgoing_block);
 }
 
@@ -241,12 +218,6 @@ inline void Cache::vc_replace(Block *incoming_block, const unsigned long &sent_a
 
 
    //If the recency hierarchy has changed, traverse the set and update recencies
-  /* if (oldest_block->recency != 0) {
-      for (Block &traversal_block : sets[sent_index].blocks)
-         if (traversal_block.recency < oldest_block->recency)
-            ++traversal_block.recency;
-      oldest_block->recency = 0;
-   }*/
    update_set_recency(sets[sent_index], *oldest_block);
 
 }
@@ -274,12 +245,6 @@ void Cache::write(const unsigned long &addr) {
          return b.recency == local_assoc - 1;
       });
       if(attempt_vc_swap(addr, index, oldest_block)) {
-         /*if (oldest_block->recency != 0) {
-            for (Block &traversal_block : sets[index].blocks)
-               if (traversal_block.recency < oldest_block->recency)
-                  ++traversal_block.recency;
-            oldest_block->recency = 0;
-         }*/
          update_set_recency(sets[index], *oldest_block);
          // Actually write to the swapped-in block
          oldest_block->dirty = true;
@@ -310,12 +275,6 @@ void Cache::write(const unsigned long &addr) {
       oldest_block->dirty = true;
 
       // Traverse and update recency
-      /*
-      for (Block &traversal_block : sets[index].blocks)
-         if (traversal_block.recency < oldest_block->recency)
-         ++traversal_block.recency;
-      oldest_block->recency = 0;
-       */
       update_set_recency(sets[index], *oldest_block);
    } else //HIT
    {
@@ -323,12 +282,6 @@ void Cache::write(const unsigned long &addr) {
       ++write_hits;
 
       //If the recency hierarchy has changed, traverse the set and update recencies
-     /* if (block->recency != 0) {
-         for (Block &traversal_block : sets[index].blocks)
-            if (traversal_block.recency < block->recency)
-               ++traversal_block.recency;
-         block->recency = 0;
-      }*/
       update_set_recency(sets[index], *block);
    }
    ++writes;
@@ -342,12 +295,7 @@ bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
       oldest_block->tag = oldest_block->tag >> index_length;
       ++vc_swap_requests;
       ++vc_swaps;
-      /*
-      for (Block &traversal_block : sets[index].blocks)
-         if(traversal_block.recency < oldest_block->recency)
-            ++traversal_block.recency;
-      oldest_block->recency = 0;
-       */
+
       update_set_recency(sets[index], *oldest_block);
       return true;
    } else if (victim_cache && !victim_cache->vc_exists(addr) && oldest_block->valid) {
