@@ -1,5 +1,21 @@
 /**
- * Cache.h encapsulates header functionality for the Cache class.
+ * Cache.cpp Source code for the Cache class, which simulates the controller for one level of a computer memory hierarchy.
+ * The cache memory may be instantiated flexibly based on a series of parameters, and may include a Level 1 (L1),
+ * an L1 cache with an accessory victim cache, a Level 2 (L2) cache, or a main memory. In general, the purpose of the
+ * simulator is to allow an architecture designer to simulate various hierarchies of cache and measure hit/miss rates
+ * across the levels, based on a memory trace from a given program execution. From this, the hierarchy design can be
+ * optimized to minimize miss rate, and maximize speed of execution, while working within known chip-area parameters.
+ *
+ * Abstractions/Recursions: The highest-level (L1) cache contains a pointer to another Cache instance: in the presence
+ * of an L2 cache, this next level points to the L2. If there is no L2, the L1's next_level points to the main memory
+ * (another instance/abstraction of the Cache class). In turn, the L2 contains a pointer to the main memory, which is
+ * another instance of the Cache class. Furthermore, in configurations where a level has a victim cache, the victim_cache
+ * pointer references yet another instance of the Cache class.
+ *
+ * These levels are traversed recursively (in the same way that a computer memory hierarchy works) such that the CPU
+ * only ever reads/writes to the interface of the L1 cache. Throughout this hierarchy, extensive use of the GoF strategy
+ * pattern enables each recursive call to handle the call, and associated data, with no outside configuration or control
+ * from the caller.
  *
  * Created on: August 27th, 2021
  * Author: Stevan Dupor
@@ -13,6 +29,15 @@
 #include <algorithm>
 #include <sstream>
 
+/*************************************** CONSTRUCTION, INITIALIZATION, DESTRUCTION ***********************************/
+
+/**
+ * Constructor for a L1, L2, or Main Memory cache. Recursively calls constructors for Victim Caches or next-level
+ * caches until the entire memory hierarchy is constructed.
+ *
+ * @param params of the entire memory hierarchy
+ * @param level of this cache (Eg, 1, 2, 0xff (main memory))
+ */
 Cache::Cache(cache_params params, uint8_t level) {
    // Initialize parameters and control switches
    this->params = params;
@@ -58,7 +83,12 @@ Cache::Cache(cache_params params, uint8_t level) {
    }
 }
 
-// Create a fully-assoc victim cache
+/**
+ * Construct a fully-associative Victim Cache.
+ *
+ * @param num_blocks the number of blocks in the fully-associative cache.
+ * @param blocksize the size of each block, in bytes.
+ */
 Cache::Cache(uint_fast32_t num_blocks, uint_fast32_t blocksize) {
    // Initialize parameters and control switches
    this->level = VC;
@@ -75,6 +105,9 @@ Cache::Cache(uint_fast32_t num_blocks, uint_fast32_t blocksize) {
    block_length = log2(block_size);
 }
 
+/**
+ * Initialize each set within (this) cache object based on the local size and local associativity.
+ */
 inline void Cache::initialize_cache_sets() {
    block_size = (uint8_t) params.block_size;
    size_t qty_sets = local_size / (local_assoc * block_size);
@@ -85,9 +118,21 @@ inline void Cache::initialize_cache_sets() {
    block_length = log2(block_size);
 }
 
-// Stub destructor
+/**
+ * Stub destructor. Utilize C++11 garbage collection functionality to handle free()s when objects fall out of scope.
+ */
 Cache::~Cache() = default;
 
+
+/******************************************* MAIN I/O INTERFACE ******************************************************/
+
+/**
+ * READS: Main IO interface for reads to this level of the memory hierarchy. Recursively reads/writes back on cache
+ * misses and local evictions to the next level down the hierarchy.If a victim cache exists at this level, utilizes the
+ * victim cache in the case of a miss.
+ *
+ * @param addr the address in memory requested by the caller (CPU or higher-level of hierarchy).
+ */
 void Cache::read(const unsigned long &addr) {
    if (this->main_memory) {
       ++this->reads;
@@ -139,6 +184,13 @@ void Cache::read(const unsigned long &addr) {
    ++reads;
 }
 
+/**
+ * WRITES: Main IO interface for writes to this level of the memory hierarchy. Recursively writes/read-allocates and
+ * writes back on cache misses and local evictions to the next level down the hierarchy. If a victim cache exists at
+ * this level, utilizes the victim cache in the case of a miss.
+ *
+ * @param addr the address in memory requested by the caller (CPU or higher-level of hierarchy).
+ */
 void Cache::write(const unsigned long &addr) {
    // If (this) is a main memory, it always HITS. Increment counter and return.
    if (this->main_memory) {
@@ -200,6 +252,14 @@ void Cache::write(const unsigned long &addr) {
    ++writes;
 }
 
+/*********************************************** VICTIM CACHE METHODS ************************************************/
+
+/**
+ * Check whether the Victim cache possesses a valid copy of the requested block
+ *
+ * @param addr The requested address
+ * @return TRUE if the block was found in the VC, FALSE if not found.
+ */
 inline bool Cache::vc_has_block(const uint_fast32_t &addr) {
    uint_fast32_t tag = addr >> (block_length);
    uint_fast32_t index = 0;
@@ -213,31 +273,42 @@ inline bool Cache::vc_has_block(const uint_fast32_t &addr) {
    return true;
 }
 
-bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
-                            std::vector<cache_blocks>::iterator &oldest_block) {
+/**
+ * Attempt to swap a provided block from the caller with a specified block in the Victim Cache. In the case where
+ * this level does not have a victim cache, handle the swap attempt as a failure. DATA DESTRUCTIVE: On a successful swap,
+ * incoming_block will be replaced with the outgoing block from the VC
+ *
+ * @param addr The requested block we want to withdraw from the victim cache
+ * @param index The integer index of the incoming block to be inserted (must be added back to the bit shifted tag to
+ *              support the different associativity.
+ * @param incoming_block The block we want to emplace into the victim cache, and where the outgoing block data will be passed to.
+ * @return true if swap was a success (caller can read/write to incoming_block), false if swap was a failure
+ *          (caller can freely evict/overwrite incoming_block)
+ */
+bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index, std::vector<Block>::iterator &incoming_block) {
    if(victim_cache && victim_cache->vc_has_block(addr)) {
       // Victim cache exists, and possesses the requested block. Swap it for the selected victim block.
-      victim_cache->vc_execute_swap(&*oldest_block, addr,
-                                    (((oldest_block->tag << index_length) + index) << block_length));
-      oldest_block->tag = oldest_block->tag >> index_length;
+      victim_cache->vc_execute_swap(&*incoming_block, addr,
+                                    (((incoming_block->tag << index_length) + index) << block_length));
+      incoming_block->tag = incoming_block->tag >> index_length;
       ++vc_swap_requests;
       ++vc_swaps;
-      update_set_recency(sets[index], *oldest_block);
+      update_set_recency(sets[index], *incoming_block);
 
       // Swap was a success, return true.
       return true;
-   } else if (victim_cache && !victim_cache->vc_has_block(addr) && oldest_block->valid) {
+   } else if (victim_cache && !victim_cache->vc_has_block(addr) && incoming_block->valid) {
       //Victim cache exists and doesn't have requested block. Push selected victim block into VC
-      victim_cache->vc_insert_block(&*oldest_block, ((oldest_block->tag << index_length) + index) << block_length);
+      victim_cache->vc_insert_block(&*incoming_block, ((incoming_block->tag << index_length) + index) << block_length);
 
       // If swapped block from VC to be evicted is dirty, writeback to next level
-      if(oldest_block->dirty && oldest_block->valid) {
-         next_level->write(oldest_block->tag  << block_length);
-         oldest_block->dirty = false;
+      if(incoming_block->dirty && incoming_block->valid) {
+         next_level->write(incoming_block->tag  << block_length);
+         incoming_block->dirty = false;
          ++write_backs;
       }
       // Remove index bits from tag to match this cache's set-associativity.
-      oldest_block->tag = oldest_block->tag >> index_length;
+      incoming_block->tag = incoming_block->tag >> index_length;
       ++vc_swap_requests;
    }
 
