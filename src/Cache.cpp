@@ -141,8 +141,6 @@ inline bool Cache::vc_exists(uint_fast32_t addr) {
       return b.valid && b.tag == tag;
    });
 
-   Block debug = *block;
-
    if (block == sets[index].blocks.end())
       return false;
    return true;
@@ -202,7 +200,6 @@ inline void Cache::vc_replace(Block *incoming_block, const unsigned long &sent_a
       return b.recency == local_assoc - 1;
    });
 
-   Block debug = *oldest_block;
    // swap the dirty bits
    bool temp_dirty = oldest_block->dirty;
    oldest_block->dirty = incoming_block->dirty;
@@ -212,14 +209,11 @@ inline void Cache::vc_replace(Block *incoming_block, const unsigned long &sent_a
    incoming_block->tag = oldest_block->tag;
    oldest_block->tag = sent_tag;
 
-   bool temp_valid = oldest_block->valid;
    incoming_block->valid = oldest_block ->valid;
    oldest_block->valid = true;
 
-
    //If the recency hierarchy has changed, traverse the set and update recencies
    update_set_recency(sets[sent_index], *oldest_block);
-
 }
 
 void Cache::write(const unsigned long &addr) {
