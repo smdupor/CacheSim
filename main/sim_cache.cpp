@@ -3,12 +3,7 @@
 #include <iostream>
 #include "Cache.h"
 
-
-/* Argument Reminders:
- *
- * sim_cache   <BLOCKSIZE>   <L1_SIZE>  <L1_ASSOC>  <VC_NUM_BLOCKS>   <L2_SIZE>  <L2_ASSOC>   <trace_file>
- *
- */
+void print_parameters_block(const char *trace_file, const cache_params &params);
 
 int main (int argc, char* argv[])
 {
@@ -40,69 +35,62 @@ int main (int argc, char* argv[])
         printf("Error: Unable to open file %s\n", trace_file);
         exit(EXIT_FAILURE);
     }
-   Cache L1 = Cache(params, 0x01);
+
+    //Instantiate cache hierarchy
+    Cache L1 = Cache(params, 0x01);
+
     // Print params
-   /* printf("  ===== Simulator configuration =====\n"
-            "  L1_BLOCKSIZE:                     %lu\n"
-            "  L1_SIZE:                          %lu\n"
-            "  L1_ASSOC:                         %lu\n"
-            "  VC_NUM_BLOCKS:                    %lu\n"
-            "  L2_SIZE:                          %lu\n"
-            "  L2_ASSOC:                         %lu\n"
-            "  trace_file:                       %s\n"
-            "  ===================================\n\n", params.block_size, params.l1_size, params.l1_assoc,
-            params.vc_num_blocks, params.l2_size, params.l2_assoc, trace_file);*/
-            std::string str_tmp="";
-   std::string pblk = "===== Simulator configuration =====\n  BLOCKSIZE:    ";
+   print_parameters_block(trace_file, params);
 
-            str_tmp = std::to_string(params.block_size);
-            L1.cat_padded(&pblk,&str_tmp);
-   pblk += "  L1_SIZE:      ";
-   str_tmp = std::to_string(params.l1_size);
-   L1.cat_padded(&pblk,&str_tmp);
-   pblk += "  L1_ASSOC:     ";
-   str_tmp = std::to_string(params.l1_assoc);
-   L1.cat_padded(&pblk,&str_tmp);
-   pblk += "  VC_NUM_BLOCKS:";
-   str_tmp = std::to_string(params.vc_num_blocks);
-   L1.cat_padded(&pblk,&str_tmp);
-   pblk += "  L2_SIZE:      ";
-   str_tmp = std::to_string(params.l2_size);
-   L1.cat_padded(&pblk,&str_tmp);
-   pblk += "  L2_ASSOC:     ";
-   str_tmp = std::to_string(params.l2_assoc);
-   L1.cat_padded(&pblk,&str_tmp);
-   pblk += "  trace_file:   ";
-   str_tmp = trace_file;
-   L1.cat_padded(&pblk,&str_tmp);
-   pblk += "\n";
-
-   std::cout << pblk;
-
-    char str[2];
-   long long count = 0;
-
-
+   char str[2];
+   // Parse tracefile; for each memory action, call read/write to memory hierarchy
     while(fscanf(FP, "%s %lx", str, &addr) != EOF)
     {
-        
         rw = str[0];
-       /* if (rw == 'r')
-            printf("%s %lx\n", "read", addr);           // Print and test if file is read correctly
-        else if (rw == 'w')
-            printf("%s %lx\n", "write", addr);          // Print and test if file is read correctly
-            */
         if (rw == 'r')
            L1.read(addr);
-
-           else if(rw == 'w')
+        else if(rw == 'w')
            L1.write(addr);
-         //if(++count  ==136)
-           // break;
     }
 
+    // Report on simulation results and statistics (recursively calls self up the hierarchy)
     L1.contents_report();
-   L1.statistics_report();
+    L1.statistics_report();
 
     return EXIT_SUCCESS;
+}
+
+void print_parameters_block(const char *trace_file, const cache_params &params) {
+   std::string temp_string;
+   std::string params_string = "===== Simulator configuration =====\n  BLOCKSIZE:    ";
+   temp_string = std::to_string(params.block_size);
+   Cache::cat_padded(&params_string, &temp_string);
+
+   params_string += "  L1_SIZE:      ";
+   temp_string = std::to_string(params.l1_size);
+   Cache::cat_padded(&params_string, &temp_string);
+
+   params_string += "  L1_ASSOC:     ";
+   temp_string = std::to_string(params.l1_assoc);
+   Cache::cat_padded(&params_string, &temp_string);
+
+   params_string += "  VC_NUM_BLOCKS:";
+   temp_string = std::to_string(params.vc_num_blocks);
+   Cache::cat_padded(&params_string, &temp_string);
+
+   params_string += "  L2_SIZE:      ";
+   temp_string = std::to_string(params.l2_size);
+   Cache::cat_padded(&params_string, &temp_string);
+
+   params_string += "  L2_ASSOC:     ";
+   temp_string = std::to_string(params.l2_assoc);
+   Cache::cat_padded(&params_string, &temp_string);
+
+   params_string += "  trace_file:   ";
+   temp_string = trace_file;
+   Cache::cat_padded(&params_string, &temp_string);
+
+   params_string += "\n";
+
+   std::cout << params_string;
 }
