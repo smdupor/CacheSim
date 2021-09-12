@@ -156,7 +156,7 @@ void Cache::read(const unsigned long &addr) {
       });
 
       // Always check if the requested block is in the victim cache. Evals to false and continues if no VC exists.
-      if(attempt_vc_swap(addr, index, oldest_block)) {
+      if(attempt_vc_swap(addr, index, &*oldest_block)) {
          ++reads;
          update_set_recency(sets[index], *oldest_block);
          return;
@@ -216,7 +216,7 @@ void Cache::write(const unsigned long &addr) {
       });
 
       // Check if block is available in the victim cache, if so, swap. Evals false and continues if VC does not exist.
-      if(attempt_vc_swap(addr, index, oldest_block)) {
+      if(attempt_vc_swap(addr, index, &*oldest_block)) {
          update_set_recency(sets[index], *oldest_block);
          oldest_block->dirty = true;
          ++writes;
@@ -285,10 +285,10 @@ inline bool Cache::vc_has_block(const uint_fast32_t &addr) {
  * @return true if swap was a success (caller can read/write to incoming_block), false if swap was a failure
  *          (caller can freely evict/overwrite incoming_block)
  */
-bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index, std::vector<Block>::iterator &incoming_block) {
+bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index, Block *incoming_block) {
    if(victim_cache && victim_cache->vc_has_block(addr)) {
       // Victim cache exists, and possesses the requested block. Swap it for the selected victim block.
-      victim_cache->vc_execute_swap(&*incoming_block, addr,
+      victim_cache->vc_execute_swap(incoming_block, addr,
                                     (((incoming_block->tag << index_length) + index) << block_length));
       incoming_block->tag = incoming_block->tag >> index_length;
       ++vc_swap_requests;

@@ -129,7 +129,7 @@ public:
    inline bool vc_has_block(const uint_fast32_t &addr);
    inline void vc_insert_block(Block *incoming_block, const unsigned long &sent_addr);
    inline void vc_execute_swap(Block *incoming_block, const unsigned long &wanted_addr, const unsigned long &sent_addr);
-   bool attempt_vc_swap(const unsigned long &addr, uint_fast32_t index, std::vector<Block>::iterator &oldest_block);
+   bool attempt_vc_swap(const unsigned long &addr, uint_fast32_t index, Block *oldest_block);
 
    // Contents and Statistics reporting interfaces
    void contents_report();
