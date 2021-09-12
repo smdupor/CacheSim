@@ -14,12 +14,16 @@
 #include <sstream>
 
 Cache::Cache(cache_params params, uint8_t level) {
+   // Initialize parameters and control switches
    this->params = params;
    this->level = level;
    this->main_memory = false;
+
+   // Initialize statistics counters
    reads = 0, read_misses = 0, read_hits = 0, writes = 0, write_misses = 0, write_hits = 0, vc_swaps = 0,
       write_backs = 0, vc_swap_requests = 0;
 
+   // Based on level parameter, instantiate this cache as an L1, an L2, or a main memory
    switch (level) {
       case MAIN_MEM: // This is a main  memory
          this->main_memory = true;
@@ -30,10 +34,12 @@ Cache::Cache(cache_params params, uint8_t level) {
          local_assoc = params.l1_assoc;
          initialize_cache_sets();
 
-         // If we get a victim cache size parameter, instantiate a victim cache
+         // If we parameters indicate we are adding a victim cache (size>0), instantiate a victim cache,
+         // otherwise, set victim_cache ptr to null.
          params.vc_num_blocks > 0 ? victim_cache = new Cache(params.vc_num_blocks, params.block_size) :
                  victim_cache = nullptr;
 
+         // Increment level and recursively instantiate either a next-level cache or a main memory
          ++level;
          if (params.l2_size == 0)
             level = MAIN_MEM; // There is no L2 cache so the next level is Main Memory
@@ -44,7 +50,9 @@ Cache::Cache(cache_params params, uint8_t level) {
          local_assoc = params.l2_assoc;
          victim_cache = nullptr;
          initialize_cache_sets();
-         level = MAIN_MEM; // Force next level to main memory
+
+         // Recursively instantiate a main memory at the next-level
+         level = MAIN_MEM;
          next_level = new Cache(params, level);
          return;
    }
@@ -52,13 +60,18 @@ Cache::Cache(cache_params params, uint8_t level) {
 
 // Create a fully-assoc victim cache
 Cache::Cache(uint_fast32_t num_blocks, uint_fast32_t blocksize) {
+   // Initialize parameters and control switches
    this->level = VC;
    this->main_memory = false;
+
+   // Initialize statistics counters
    reads = 0, read_misses = 0, read_hits = 0, writes = 0, write_misses = 0, write_hits = 0, vc_swaps = 0, write_backs = 0, vc_swap_requests = 0;
+
+   // Create the fully-associative victim cache
    block_size=blocksize;
    local_assoc = num_blocks;
    sets.emplace_back(Set(local_assoc));
-   index_length = 0;
+   index_length = 0; // Fully-associative
    block_length = log2(block_size);
 }
 
@@ -126,84 +139,6 @@ void Cache::read(const unsigned long &addr) {
    ++reads;
 }
 
-inline bool Cache::vc_has_block(const uint_fast32_t &addr) {
-   uint_fast32_t tag = addr >> (block_length);
-   uint_fast32_t index = 0;
-
-   auto block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
-      return b.valid && b.tag == tag;
-   });
-
-   if (block == sets[index].blocks.end())
-      return false;
-   return true;
-}
-
-inline void Cache::extract_tag_index(uint_fast32_t *tag, uint_fast32_t *index, const unsigned long *addr) const {
-   *tag = *addr >> (index_length + block_length);
-   *index = *addr - (*tag << (index_length + block_length));
-   *index = *index >> block_length;
-}
-
-inline void Cache::update_set_recency(Set &set, Block &block) {
-   if (block.recency != 0) {
-      for (Block &traversal_block: set.blocks)
-         if (traversal_block < block)
-            ++traversal_block.recency;
-      block.recency = 0;
-   }
-}
-
-inline void Cache::vc_execute_swap(Block *incoming_block, const unsigned long &wanted_addr,
-                                   const unsigned long &sent_addr) {
-   uint_fast32_t wanted_tag=wanted_addr>>block_length, wanted_index=0;
-   uint_fast32_t sent_tag = sent_addr>>block_length;
-
-   Block *outgoing_block = &*std::find_if(sets[wanted_index].blocks.begin(), sets[wanted_index].blocks.end(), [&](Block b) {
-      return b.valid && b.tag == wanted_tag;
-   });
-
-   // swap the dirty bits
-   bool temp_dirty = outgoing_block->dirty;
-   outgoing_block->dirty = incoming_block->dirty;
-   incoming_block->dirty = temp_dirty;
-
-   // Swap the tags/data. NOTE: In the caller, we must right shift the wanted_index out of the returned block.
-   incoming_block->tag = outgoing_block->tag;
-   outgoing_block->tag = sent_tag;
-   incoming_block->valid = outgoing_block->valid;
-   outgoing_block->valid = true;
-
-   //If the recency hierarchy has changed, traverse the set and update recencies
-   update_set_recency(sets[wanted_index], *outgoing_block);
-}
-
-// Emplace this block into the VC, in place of oldest block. If oldest block is invalid/available, ensure dirty
-//bit is cleared so no writeback is called.
-inline void Cache::vc_insert_block(Block *incoming_block, const unsigned long &sent_addr) {
-
-   uint_fast32_t sent_tag = sent_addr>>block_length, sent_index=0;
-
-   // Find Oldest block
-   auto oldest_block = std::find_if(sets[sent_index].blocks.begin(), sets[sent_index].blocks.end(), [&](Block b) {
-      return b.recency == local_assoc - 1;
-   });
-
-   // swap the dirty bits
-   bool temp_dirty = oldest_block->dirty;
-   oldest_block->dirty = incoming_block->dirty;
-   incoming_block->dirty = temp_dirty;
-
-   // Swap the tags. In the caller, we must right shift the sent_index out to match caller set associativity.
-   incoming_block->tag = oldest_block->tag;
-   oldest_block->tag = sent_tag;
-   incoming_block->valid = oldest_block ->valid;
-   oldest_block->valid = true;
-
-   //If the recency hierarchy has changed, traverse the set and update recencies
-   update_set_recency(sets[sent_index], *oldest_block);
-}
-
 void Cache::write(const unsigned long &addr) {
    // If (this) is a main memory, it always HITS. Increment counter and return.
    if (this->main_memory) {
@@ -265,6 +200,19 @@ void Cache::write(const unsigned long &addr) {
    ++writes;
 }
 
+inline bool Cache::vc_has_block(const uint_fast32_t &addr) {
+   uint_fast32_t tag = addr >> (block_length);
+   uint_fast32_t index = 0;
+
+   auto block = std::find_if(sets[index].blocks.begin(), sets[index].blocks.end(), [&](Block b) {
+      return b.valid && b.tag == tag;
+   });
+
+   if (block == sets[index].blocks.end())
+      return false;
+   return true;
+}
+
 bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
                             std::vector<cache_blocks>::iterator &oldest_block) {
    if(victim_cache && victim_cache->vc_has_block(addr)) {
@@ -296,6 +244,71 @@ bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
    // Either VC exists and did not have the block, or VC does not exist; oldest_block is now free to be evicted
    // to the next level, return false.
    return false;
+}
+
+inline void Cache::vc_execute_swap(Block *incoming_block, const unsigned long &wanted_addr,
+                                   const unsigned long &sent_addr) {
+   uint_fast32_t wanted_tag=wanted_addr>>block_length, wanted_index=0;
+   uint_fast32_t sent_tag = sent_addr>>block_length;
+
+   Block *outgoing_block = &*std::find_if(sets[wanted_index].blocks.begin(), sets[wanted_index].blocks.end(), [&](Block b) {
+      return b.valid && b.tag == wanted_tag;
+   });
+
+   // swap the dirty bits
+   bool temp_dirty = outgoing_block->dirty;
+   outgoing_block->dirty = incoming_block->dirty;
+   incoming_block->dirty = temp_dirty;
+
+   // Swap the tags/data. NOTE: In the caller, we must right shift the wanted_index out of the returned block.
+   incoming_block->tag = outgoing_block->tag;
+   outgoing_block->tag = sent_tag;
+   incoming_block->valid = outgoing_block->valid;
+   outgoing_block->valid = true;
+
+   //If the recency hierarchy has changed, traverse the set and update recencies
+   update_set_recency(sets[wanted_index], *outgoing_block);
+}
+
+// Emplace this block into the VC, in place of oldest block. If oldest block is invalid/available, ensure dirty
+//bit is cleared so no writeback is called.
+inline void Cache::vc_insert_block(Block *incoming_block, const unsigned long &sent_addr) {
+
+   uint_fast32_t sent_tag = sent_addr>>block_length, sent_index=0;
+
+   // Find Oldest block
+   auto oldest_block = std::find_if(sets[sent_index].blocks.begin(), sets[sent_index].blocks.end(), [&](Block b) {
+      return b.recency == local_assoc - 1;
+   });
+
+   // swap the dirty bits
+   bool temp_dirty = oldest_block->dirty;
+   oldest_block->dirty = incoming_block->dirty;
+   incoming_block->dirty = temp_dirty;
+
+   // Swap the tags. In the caller, we must right shift the sent_index out to match caller set associativity.
+   incoming_block->tag = oldest_block->tag;
+   oldest_block->tag = sent_tag;
+   incoming_block->valid = oldest_block ->valid;
+   oldest_block->valid = true;
+
+   //If the recency hierarchy has changed, traverse the set and update recencies
+   update_set_recency(sets[sent_index], *oldest_block);
+}
+
+inline void Cache::extract_tag_index(uint_fast32_t *tag, uint_fast32_t *index, const unsigned long *addr) const {
+   *tag = *addr >> (index_length + block_length);
+   *index = *addr - (*tag << (index_length + block_length));
+   *index = *index >> block_length;
+}
+
+inline void Cache::update_set_recency(Set &set, Block &block) {
+   if (block.recency != 0) {
+      for (Block &traversal_block: set.blocks)
+         if (traversal_block < block)
+            ++traversal_block.recency;
+      block.recency = 0;
+   }
 }
 
 void Cache::contents_report() {
