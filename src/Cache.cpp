@@ -274,9 +274,10 @@ inline bool Cache::vc_has_block(const uint_fast32_t &addr) {
 }
 
 /**
- * Attempt to swap a provided block from the caller with a specified block in the Victim Cache. In the case where
- * this level does not have a victim cache, handle the swap attempt as a failure. DATA DESTRUCTIVE: On a successful swap,
- * incoming_block will be replaced with the outgoing block from the VC
+ * If it is possible to swap a provided block from the caller with a specified block in the Victim Cache, call
+ * execute_vc_swap to perform the actual swap. In the case where this level does not have a victim cache, handle the
+ * swap attempt as a failure. DATA DESTRUCTIVE: On a successful swap, incoming_block will be replaced with the outgoing
+ * block from the VC (tag incorrect based on other-level associativity), and must be handled by the caller.
  *
  * @param addr The requested block we want to withdraw from the victim cache
  * @param index The integer index of the incoming block to be inserted (must be added back to the bit shifted tag to
@@ -317,6 +318,15 @@ bool Cache::attempt_vc_swap(const unsigned long &addr, uint_fast32_t index, Bloc
    return false;
 }
 
+/**
+ * Perform the actual swap between an incoming block, and a specified block within the victim cache.
+ * DATA DESTRUCTIVE: On a successful swap, incoming_block will be replaced with the outgoing
+ * block from the VC (tag incorrect based on other-level associativity), and must be handled by the caller.
+ *
+ * @param incoming_block the block to be emplaced into the VC, and where the outgoing block data is written
+ * @param wanted_addr the full-length address of the block we want from the VC
+ * @param sent_addr the full-length address of the block we are sending to the VC
+ */
 inline void Cache::vc_execute_swap(Block *incoming_block, const unsigned long &wanted_addr,
                                    const unsigned long &sent_addr) {
    uint_fast32_t wanted_tag=wanted_addr>>block_length, wanted_index=0;
@@ -341,8 +351,14 @@ inline void Cache::vc_execute_swap(Block *incoming_block, const unsigned long &w
    update_set_recency(sets[wanted_index], *outgoing_block);
 }
 
-// Emplace this block into the VC, in place of oldest block. If oldest block is invalid/available, ensure dirty
-//bit is cleared so no writeback is called.
+/**
+ * Insert this block into the victim cache WITHOUT performing a swap with a specific block. Replaces the oldest block
+ * in the victim cache.
+ *
+ * @param incoming_block the block we want to emplace into the VC. On return, contains a block that MAY need to be
+ *                       written back to the next level.
+ * @param sent_addr the full-length address of the block we are emplacing into the VC
+ */
 inline void Cache::vc_insert_block(Block *incoming_block, const unsigned long &sent_addr) {
 
    uint_fast32_t sent_tag = sent_addr>>block_length, sent_index=0;
@@ -367,12 +383,30 @@ inline void Cache::vc_insert_block(Block *incoming_block, const unsigned long &s
    update_set_recency(sets[sent_index], *oldest_block);
 }
 
+/********************************************* UTILITY METHODS *******************************************************/
+
+/**
+ * Given a full-length memory address, calculate the proper tag and index for this level of cache, and write those data
+ * into tag and index.
+ *
+ * @param tag the calculated tag from addr
+ * @param index the calculated index from addr
+ * @param addr the full-length memory address
+ */
 inline void Cache::extract_tag_index(uint_fast32_t *tag, uint_fast32_t *index, const unsigned long *addr) const {
    *tag = *addr >> (index_length + block_length);
    *index = *addr - (*tag << (index_length + block_length));
    *index = *index >> block_length;
 }
 
+/**
+ * Traverse a given set, and update the recency of the blocks within that set based on an access to the passed-in block.
+ * The passed-in block becomes most recent (recency=0), the recency of older blocks than the passed-in block stays the
+ * same, and the recency of newer blocks is incremented by 1.
+ *
+ * @param set reference to the full set of blocks needing recency updated
+ * @param block the block to be updated as most-recently-accessed
+ */
 inline void Cache::update_set_recency(Set &set, Block &block) {
    if (block.recency != 0) {
       for (Block &traversal_block: set.blocks)
@@ -382,26 +416,46 @@ inline void Cache::update_set_recency(Set &set, Block &block) {
    }
 }
 
+/******************************************** STATISTICS and REPORTING ***********************************************/
+
+/**
+ * Traverse the entire contents of this cache at the time of calling, and call cache_line_report for each set to
+ * generate report to stdout. If this is a main memory, do not print contents.
+ *
+ * Recursively call for subsequent victim caches and levels until the entire hierarchy has been reported on.
+ */
 void Cache::contents_report() {
-   if (this->main_memory)
+   if (this->main_memory) {
       return;
-   else if(this->level==VC) {
+   }
+
+   else if(this->level==VC) { // Print victim cache header, contents, and return if this is a VC.
       std::cout << "===== VC contents =====\n";
       cache_line_report(0);
       std::cout << std::endl;
       return;
    }
-   else
+   else { // Print cache level header and continue
       std::cout << "===== L" << std::to_string(this->level) << " contents =====\n";
-
+   }
+   // Print the contents of each set to console
    for (size_t i = 0; i < sets.size(); ++i)
       cache_line_report(i);
    std::cout << "\n";
+
+   //If this cache level has a victim cache attached, recursively run report on the VC
    if(victim_cache)
       victim_cache->contents_report();
+
+   // Recursively run report on the next level of the memory hierarchy
    this->next_level->contents_report();
 }
 
+/**
+ * For a given set, traverse set and print entire contents as well as dirty status.
+ *
+ * @param set_num
+ */
 void Cache::cache_line_report(uint8_t set_num) {
    std::string output = "  set  ";
    if (set_num <= 9 )
@@ -415,15 +469,24 @@ void Cache::cache_line_report(uint8_t set_num) {
 
    // Traverse the set and Convert the contents to a string
    for (Block &b : temp_set) {
+      // Handle the fact that the example code uses an extra space for victim caches here.
       this->level == VC ? output += " " : output += "  ";
-      std::stringstream ss;
-      ss << std::hex << b.tag;
-      output += ss.str();
-      output += " ";
-      if (b.dirty)
-         output += "D";
-      else
+
+      if(b.valid) { // If this block is valid, concatenate contents
+         // convert unsigned 32 long to hex string
+         std::stringstream ss;
+         ss << std::hex << b.tag;
+         output += ss.str();
          output += " ";
+         if (b.dirty)
+            output += "D";
+         else
+            output += " ";
+      }
+      else
+      { // If block is invalid/empty, simply concatenate a whitespace-padded dash
+         output += "   -     ";
+      }
    }
    output += "\n";
 
@@ -431,6 +494,10 @@ void Cache::cache_line_report(uint8_t set_num) {
    std::cout << output;
 }
 
+/**
+ * Run the appropriate statistics report for this level of hierarchy. Recursively call until all statistics have been
+ * reported for the entire memory.
+ */
 void Cache::statistics_report() {
    if (this->level == L1) {
       L1_stats_report();
@@ -440,6 +507,9 @@ void Cache::statistics_report() {
    L2_stats_report();
 }
 
+/**
+ * Report statistics for Level-1 caches to the console.
+ */
 void Cache::L1_stats_report() {
    std::string output = "===== Simulation results =====\n";
    output += "  a. number of L1 reads:                ";
@@ -464,10 +534,13 @@ void Cache::L1_stats_report() {
    std::cout << output;
 }
 
+/**
+ * Report statistics for level-2 caches to the console
+ */
 void Cache::L2_stats_report() {
    std::string output = "";
 
-   if (level == L2) {
+   if (level == L2) { // This hierarchy has a level-2 cache
       output += "  j. number of L2 reads:                ";
       cat_padded(&output, this->reads);
       output += "  k. number of L2 read misses:          ";
@@ -482,7 +555,7 @@ void Cache::L2_stats_report() {
       cat_padded(&output, this->write_backs);
       output += "  p. total memory traffic:              ";
       cat_padded(&output, (this->next_level->reads + this->next_level->writes));
-   } else {
+   } else { // This hierarchy DOES NOT HAVE a level-2 cache, and this method is being called on the main memory.
       output += "  j. number of L2 reads:                ";
       cat_padded(&output, (uint_fast32_t) 0);
       output += "  k. number of L2 read misses:          ";
@@ -501,7 +574,15 @@ void Cache::L2_stats_report() {
    std::cout << output;
 }
 
-// Attach a numeric value to the end of a string with space padding
+/************************************** STRING MANIPULATION METHODS **************************************************/
+
+/**
+ * Concatenate an integer to the end of a string, and add whitespace padding up to a predefined amount before the
+ * integer.
+ *
+ * @param str the string to be concatenated to
+ * @param n the integer to emplace at the end of the string.
+ */
 void Cache::cat_padded(std::string *str, uint_fast32_t n) {
    std::string value = std::to_string(n);
    while (value.length() < 12)
@@ -510,7 +591,13 @@ void Cache::cat_padded(std::string *str, uint_fast32_t n) {
    *str += value;
 }
 
-// Attach a numeric value to the end of a string with space padding
+/**
+ * Concatenate a Double to the end of a string, and add whitespace padding up to a predefined amount before the
+ * double.
+ *
+ * @param str the string to be concatenated to
+ * @param n the double to emplace at the end of the string.
+ */
 void Cache::cat_padded(std::string *str, double n) {
    std::string value = std::to_string(n).substr(0, 6);
    while (value.length() < 12)
@@ -519,11 +606,17 @@ void Cache::cat_padded(std::string *str, double n) {
    *str += value;
 }
 
-// Attach a numeric value to the end of a string with space padding
-void Cache::cat_padded(std::string *str, std::string *cat) {
-   std::string value = *cat;
+/**
+ * Concatenate a String to the end of a string, and add whitespace padding up to a predefined amount before the
+ * String to be added.
+ *
+ * @param head the string to be concatenated to
+ * @param tail the string to emplace at the end of "head" with up to 16 spaces in the middle.
+ */
+void Cache::cat_padded(std::string *head, std::string *tail) {
+   std::string value = *tail;
    while (value.length() < 16)
       value = " " + value;
    value += "\n";
-   *str += value;
+   *head += value;
 }

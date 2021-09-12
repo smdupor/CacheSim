@@ -136,7 +136,7 @@ public:
    void statistics_report();
 
    // External string-manipulation with whitespace padding utility method
-   static void cat_padded(std::string *str, std::string *cat);
+   static void cat_padded(std::string *head, std::string *cat);
 };
 
 #endif //CACHESIM_INCLUDE_CACHE_H
