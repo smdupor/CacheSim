@@ -66,8 +66,8 @@ private:
 
    // Current Access indices
    uint_fast32_t current_index, current_tag;
-   inline void initialize_cache_memory();
-   inline void update_set_recency(Set &set, Block &block);
+   inline void initialize_cache_sets();
+   static inline void update_set_recency(Set &set, Block &block);
 
    void cache_line_report(uint8_t set_num);
    void L1_stats_report();
@@ -75,7 +75,7 @@ private:
    void cat_padded(std::string *str, uint_fast32_t n);
    void cat_padded(std::string *str, double n);
 
-   void extract_tag_index(uint_fast32_t *tag, uint_fast32_t *index, const uint_fast32_t *addr);
+   void extract_tag_index(uint_fast32_t *tag, uint_fast32_t *index, const uint_fast32_t *addr) const;
 
 public:
    Cache(cache_params params, uint8_t level);
@@ -83,9 +83,9 @@ public:
    ~Cache();
    void read(const unsigned long &addr);
    void write(const unsigned long &addr);
-   inline bool vc_exists(uint_fast32_t addr);
-   inline void vc_replace(Block *b, const unsigned long &sent_addr);
-   inline void vc_swap(Block *incoming_block, const unsigned long &wanted_addr, const unsigned long &sent_addr);
+   inline bool vc_has_block(const uint_fast32_t &addr);
+   inline void vc_insert_block(Block *incoming_block, const unsigned long &sent_addr);
+   inline void vc_execute_swap(Block *incoming_block, const unsigned long &wanted_addr, const unsigned long &sent_addr);
    void contents_report();
    void statistics_report();
    bool attempt_vc_swap(const unsigned long &addr, uint_fast32_t index,
