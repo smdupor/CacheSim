@@ -1,5 +1,5 @@
-Cache Size(bytes), Cache Size(kb), Block Size(bytes), Associativity, Access Time(ns), Energy Per Access(nJ), Area(mm*mm),,
-64,,32,FA,0.131305,0.00292369,0.000347749,,"Cacti failed on this config. Assume same values as for size=128B, blocksize=32B -- except half the area."
-128,,32,FA,0.131305,0.00292369,0.000695498,,
-256,,32,FA,0.135715,0.00324502,0.001320463,,
-512,,32,FA,0.142543,0.00390074,0.002485412,,
+vcs,bs,assoc,at,Energy Per Access(nJ),area
+2,32,FA,0.131305,0.00292369,0.000347749
+4,32,FA,0.131305,0.00292369,0.000695498
+8,32,FA,0.135715,0.00324502,0.001320463
+16,32,FA,0.142543,0.00390074,0.002485412
