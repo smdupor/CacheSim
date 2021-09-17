@@ -22,7 +22,7 @@ df = pd.DataFrame(data, columns=[' l1a', ' l1s', ' l1missrate'])
 
 df['log2l1s'] = np.log2(df[' l1s'])
 df[' l1a'] = df[' l1a'].apply(replace_set_assoc)
-
+df.to_csv(r'g1_prepivot_raw.csv')
 df = df.pivot(index='log2l1s', columns=' l1a', values=' l1missrate')
 
 print(df)
@@ -36,6 +36,7 @@ plt.title("Graph 1: L1 Miss Rate vs L1 Size(log2)")
 plt.legend()
 outFname = "Graph1-Rev.png"
 plt.savefig(outFname)
+df.to_csv(r'g1raw.csv')
 plt.show()
 #outFname = sys.argv[1]+".png"
 
