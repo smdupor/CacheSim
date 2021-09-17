@@ -62,15 +62,19 @@ df[' l2a'] = df[' l2a'].apply(xform_set_assoc)
 df['l1at'] = np.nan
 df['l2at'] = np.nan
 df['aat'] = np.nan
+df['area'] = np.nan
 
 for i, row in df.iterrows():
     l1temp = cacti[(row[' l1s'] == cacti['size']) & (cacti['assoc'] == row[' l1a']) & (cacti['blocksize'] == 32)]
     l2temp = cacti[(row[' l2s'] == cacti['size']) & (cacti['assoc'] == row[' l2a']) & (cacti['blocksize'] == 32)]
+
     if not l1temp.empty:
         df['l1at'][i] = l1temp['at']
+        df['area'][i] = l1temp['area']
 
     if not l2temp.empty:
         df['l2at'][i] = l2temp['at']
+        df['area'][i] += l2temp['area']
 
 # print(df)
 df[' l1a'] = df[' l1a'].apply(replace_set_assoc)
