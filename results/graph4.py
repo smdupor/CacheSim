@@ -84,7 +84,9 @@ df.to_csv(r'g4_prepivot_raw.csv')
 df = df.pivot(index='log2bs', columns=' l1s', values=' l1missrate')
 
 
-df.plot(y=['1KiB', '2KiB', '4KiB', '8KiB', '16KiB', '32KiB'])
+df.plot(y=['1KiB', '2KiB', '4KiB', '8KiB', '16KiB', '32KiB'], marker='x', markersize='5')
+fig = plt.gcf()
+fig.set_size_inches(8, 6, forward=True)
 
 
 plt.xlabel("log2(BLOCKSIZE (B))")
@@ -92,7 +94,7 @@ plt.ylabel("L1 Miss Rate")
 plt.title("Graph 4: Miss Rate vs Block Size")
 plt.legend(title='L1 Size')
 
-outFname = "Graph4.png"
+outFname = "Graph4-rev.png"
 plt.savefig(outFname)
 df.to_csv(r'g4_raw.csv')
 plt.show()

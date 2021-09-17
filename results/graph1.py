@@ -27,17 +27,19 @@ df = df.pivot(index='log2l1s', columns=' l1a', values=' l1missrate')
 
 print(df)
 #render = df.plot(figsize=(5,3))
-df.plot( y=['Direct Mapped', '2-way Set Assoc.', '4-way Set Assoc.', '8-way Set Assoc.', 'Fully Assoc.'])
+df.plot( y=['Direct Mapped', '2-way Set Assoc.', '4-way Set Assoc.', '8-way Set Assoc.', 'Fully Assoc.'], marker='x', markersize='5')
+fig = plt.gcf()
+fig.set_size_inches(8, 6, forward=True)
 
 #print(np.mean(dfmult, axis=1))
 plt.xlabel("log2(L1_SIZE (B))")
 plt.ylabel("L1 Miss Rate")
 plt.title("Graph 1: L1 Miss Rate vs L1 Size(log2)")
 plt.legend()
-outFname = "Graph1-Rev.png"
-plt.savefig(outFname)
+outFname = "Graph1-Rev2.png"
+fig.savefig(outFname)
 df.to_csv(r'g1raw.csv')
-plt.show()
+fig.show()
 #outFname = sys.argv[1]+".png"
 
 

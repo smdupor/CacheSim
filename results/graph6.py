@@ -127,14 +127,16 @@ print(df)
 # y=['Direct Mapped', '2-way Set Assoc.', '4-way Set Assoc.', '8-way Set Assoc.', 'Fully Assoc.'] marker='o'
 df.plot(y=['Direct Mapped L1 w/ No VC', 'Direct Mapped L1 w/ 2-entry VC', 'Direct Mapped L1 w/ 4-entry VC',
            'Direct Mapped L1 w/ 8-entry VC', 'Direct Mapped L1 w/ 16-entry VC', '2-way Set Assoc. L1 w/ No VC',
-           '4-way Set Assoc. L1 w/ No VC'])
+           '4-way Set Assoc. L1 w/ No VC'], marker='x', markersize='5')
+fig = plt.gcf()
+fig.set_size_inches(8, 6, forward=True)
 
 plt.xlabel("log2(L1_SIZE (B))")
 plt.ylabel("Avg. Access Time (nS)")
 plt.title("Graph 6: Avg. Access Across Varying L1/L2 Sizes")
 plt.legend(title="L2 Size")
 
-outFname = "Graph6.png"
+outFname = "Graph6-rev.png"
 plt.savefig(outFname)
 df.to_csv(r'g6_raw.csv')
 plt.show()

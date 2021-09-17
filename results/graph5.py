@@ -89,14 +89,16 @@ df.to_csv(r'g5_prepivot_raw.csv')
 df = df.pivot(index='log2l1s', columns=' l2s', values='aat')
 
 # y=['Direct Mapped', '2-way Set Assoc.', '4-way Set Assoc.', '8-way Set Assoc.', 'Fully Assoc.'] marker='o'
-df.plot(y=['32KiB', '64KiB', '128KiB', '256KiB', '512KiB', '1MiB'])
+df.plot(y=['32KiB', '64KiB', '128KiB', '256KiB', '512KiB', '1MiB'], marker='x', markersize='5')
+fig = plt.gcf()
+fig.set_size_inches(8, 6, forward=True)
 
 plt.xlabel("log2(L1_SIZE (B))")
 plt.ylabel("Avg. Access Time (nS)")
 plt.title("Graph 5: Avg. Access Across Varying L1/L2 Sizes")
 plt.legend(title="L2 Size")
 
-outFname = "Graph5.png"
+outFname = "Graph5-rev.png"
 plt.savefig(outFname)
 df.to_csv(r'g5_raw.csv')
 plt.show()

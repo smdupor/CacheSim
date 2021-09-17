@@ -67,7 +67,9 @@ df.to_csv(r'g3_prepivot_raw.csv')
 df = df.pivot(index='log2l1s', columns=' l1a', values='aat')
 
 
-df.plot(y=['Direct Mapped', '2-way Set Assoc.', '4-way Set Assoc.', '8-way Set Assoc.', 'Fully Assoc.'])
+df.plot(y=['Direct Mapped', '2-way Set Assoc.', '4-way Set Assoc.', '8-way Set Assoc.', 'Fully Assoc.'], marker='x', markersize='5')
+fig = plt.gcf()
+fig.set_size_inches(8, 6, forward=True)
 
 
 plt.xlabel("log2(L1_SIZE (B))")
@@ -75,7 +77,7 @@ plt.ylabel("Avg. Access Time (nS)")
 plt.title("Graph 3: Avg. Access Time With L2 Cache Enabled")
 plt.legend()
 
-outFname = "Graph3.png"
+outFname = "Graph3-rev.png"
 plt.savefig(outFname)
 df.to_csv(r'g3_raw.csv')
 plt.show()
