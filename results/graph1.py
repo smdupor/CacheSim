@@ -30,12 +30,12 @@ print(df)
 df.plot( y=['Direct Mapped', '2-way Set Assoc.', '4-way Set Assoc.', '8-way Set Assoc.', 'Fully Assoc.'])
 
 #print(np.mean(dfmult, axis=1))
-plt.xlabel("log2(L1_SIZE)")
+plt.xlabel("log2(L1_SIZE (B))")
 plt.ylabel("L1 Miss Rate")
 plt.title("Graph 1: L1 Miss Rate vs L1 Size(log2)")
 plt.legend()
 plt.show()
 #outFname = sys.argv[1]+".png"
-outFname = "Graph1.png"
+outFname = "Graph1-Rev.png"
 plt.savefig(outFname)
 
