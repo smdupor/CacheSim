@@ -63,9 +63,10 @@ plt.xlabel("log2(L1_SIZE (B))")
 plt.ylabel("Avg. Access Time (nS)")
 plt.title("Graph 2: Avg. Access Time vs L1 Size(log2)")
 plt.legend()
-plt.show()
-
 
 outFname = "Graph2.png"
 plt.savefig(outFname)
+plt.show()
+
+
 

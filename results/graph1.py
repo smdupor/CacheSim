@@ -34,8 +34,9 @@ plt.xlabel("log2(L1_SIZE (B))")
 plt.ylabel("L1 Miss Rate")
 plt.title("Graph 1: L1 Miss Rate vs L1 Size(log2)")
 plt.legend()
-plt.show()
-#outFname = sys.argv[1]+".png"
 outFname = "Graph1-Rev.png"
 plt.savefig(outFname)
+plt.show()
+#outFname = sys.argv[1]+".png"
+
 
