@@ -1,4 +1,4 @@
-CXXFLAGS = -I include/ -O3 -Wall -fmessage-length=0 -std=c++11
+CXXFLAGS = -I include/ -s -O3 -Wall -fmessage-length=0 -std=c++11
 
 SRC_DIR_LIB=src
 SRC_DIR_EXE=main
@@ -26,14 +26,17 @@ $(BIN_DIR)/%:	$(OBJ_DIR_EXE)/%.o
 	$(CXX) -o $@ -s $(subst $(BIN_DIR)/,$(OBJ_DIR_EXE)/,$@).o $(OBJ_FILES_LIB) $(HEAD_FILES) $(LDFLAGS) $(CXXFLAGS)
 	#$(CXX) -o $@ $(subst $(BIN_DIR)/,$(OBJ_DIR_EXE)/,$@).o $(OBJ_FILES_LIB) $(HEAD_FILES) $(LDFLAGS) $(CXXFLAGS)
 
-all:	PRE_REQ $(EXEC_FILES) $(OBJ_FILES_LIB)
+all:
+	g++ -o Cache.o -c Cache.cpp -O3 -Wall -fmessage-length=0 -std=c++11
+	g++ -o sim_cache.o -c sim_cache.cpp -O3 -Wall -fmessage-length=0 -std=c++11
+	g++ -o sim_cache -s sim_cache.o Cache.o  -O3 -Wall -fmessage-length=0 -std=c++11
+    #g++ -o bin/sim_cache obj/exe/sim_cache.o obj/lib/Cache.o include/Cache.h  -I include/ -O3 -Wall -fmessage-length=0 -std=c++11
 	@echo "Cleaning and Symlinking."
-	rm -rf ./obj
-	ln -sf ./bin/sim_cache sim_cache
+	rm -rf *.o
 	@echo " "
-	@echo "************************************************************************************************"
-	@echo "********************************** BUILD COMPLETE **********************************************"
-	@echo "************************************************************************************************"
+	@echo "**************************************************************************************"
+	@echo "***************************** BUILD COMPLETE *****************************************"
+	@echo "**************************************************************************************"
 
 PRE_REQ:
 	rm -rf ./obj
@@ -53,6 +56,6 @@ show:
 
 clean:
 	rm -rf *.o
-	rm -rf ./bin
-	rm -rf ./obj
+	#rm -rf ./bin
+	#rm -rf ./obj
 	rm -f sim_cache
